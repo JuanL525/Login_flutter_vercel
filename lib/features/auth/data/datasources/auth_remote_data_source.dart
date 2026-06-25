@@ -1,5 +1,6 @@
 import 'package:injectable/injectable.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../../core/constants/app_constants.dart';
 import '../models/user_model.dart';
 
 abstract class AuthRemoteDataSource {
@@ -65,6 +66,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         email: email,
         password: password,
         data: displayName != null ? {'display_name': displayName} : null,
+        emailRedirectTo:
+            '${AppConstants.vercelBaseUrl}${AppConstants.emailVerificationPath}',
       );
 
       if (response.user == null) {
@@ -84,7 +87,11 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     required String email,
   }) async {
     try {
-      await supabaseClient.auth.resetPasswordForEmail(email);
+      await supabaseClient.auth.resetPasswordForEmail(
+        email,
+        redirectTo:
+            '${AppConstants.vercelBaseUrl}${AppConstants.resetPasswordPath}',
+      );
     } on AuthException catch (e) {
       throw Exception(e.message);
     } catch (e) {
