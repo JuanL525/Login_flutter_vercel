@@ -41,6 +41,12 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>La app necesita la camara para fotografiar las actas de escrutinio.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>La app necesita acceso a fotos para adjuntar la imagen del acta.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>La app registra las coordenadas GPS donde se fotografia cada acta.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>

@@ -1,26 +1,24 @@
 import 'package:dartz/dartz.dart';
 import '../../../../core/error/failures.dart';
-import '../entities/user_entity.dart';
+import '../entities/session_entity.dart';
 
 abstract class AuthRepository {
-  Future<Either<Failure, UserEntity>> signInWithEmailAndPassword({
-    required String email,
+  /// Inicia sesion usando la cedula como nombre de usuario.
+  Future<Either<Failure, SessionEntity>> signInWithCedula({
+    required String cedula,
     required String password,
   });
 
-  Future<Either<Failure, UserEntity>> signUpWithEmailAndPassword({
-    required String email,
-    required String password,
-    String? displayName,
-  });
+  /// Envia el correo de restablecimiento de contrasena.
+  Future<Either<Failure, void>> sendPasswordResetEmail({required String email});
 
-  Future<Either<Failure, void>> sendPasswordResetEmail({
-    required String email,
+  /// Cambia la contrasena del usuario actual y limpia must_change_password.
+  Future<Either<Failure, SessionEntity>> changePassword({
+    required String newPassword,
   });
 
   Future<Either<Failure, void>> signOut();
 
-  Future<Either<Failure, UserEntity?>> getCurrentUser();
-
-  Stream<UserEntity?> get authStateChanges;
+  /// Devuelve la sesion actual (con perfil) o null si no hay sesion.
+  Future<Either<Failure, SessionEntity?>> getCurrentSession();
 }

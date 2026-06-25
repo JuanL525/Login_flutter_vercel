@@ -5,9 +5,7 @@ import '../bloc/auth_event.dart';
 import '../bloc/auth_state.dart';
 import '../widgets/custom_text_field.dart';
 import '../widgets/loading_overlay.dart';
-import 'register_page.dart';
 import 'reset_password_page.dart';
-import 'welcome_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -18,12 +16,12 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
+  final _cedulaController = TextEditingController();
   final _passwordController = TextEditingController();
 
   @override
   void dispose() {
-    _emailController.dispose();
+    _cedulaController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
@@ -32,7 +30,7 @@ class _LoginPageState extends State<LoginPage> {
     if (_formKey.currentState!.validate()) {
       context.read<AuthBloc>().add(
             SignInRequested(
-              email: _emailController.text.trim(),
+              cedula: _cedulaController.text.trim(),
               password: _passwordController.text,
             ),
           );
@@ -49,12 +47,6 @@ class _LoginPageState extends State<LoginPage> {
               SnackBar(
                 content: Text(state.message),
                 backgroundColor: Theme.of(context).colorScheme.error,
-              ),
-            );
-          } else if (state is AuthAuthenticated) {
-            Navigator.of(context).pushReplacement(
-              MaterialPageRoute(
-                builder: (_) => WelcomePage(user: state.user),
               ),
             );
           }
@@ -74,67 +66,55 @@ class _LoginPageState extends State<LoginPage> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // Logo o icono
                         Icon(
-                          Icons.lock_person_rounded,
+                          Icons.how_to_vote_rounded,
                           size: 80,
                           color: Theme.of(context).colorScheme.primary,
                         ),
                         const SizedBox(height: 24),
-
-                        // Título
                         Text(
-                          'Bienvenido',
+                          'Control Electoral',
                           style: Theme.of(context).textTheme.displayMedium,
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'Inicia sesión para continuar',
+                          'Inicia sesion con tu cedula',
                           style: Theme.of(context).textTheme.bodyMedium,
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 48),
-
-                        // Email field
                         CustomTextField(
-                          controller: _emailController,
-                          label: 'Correo electrónico',
-                          hint: 'tu@email.com',
-                          prefixIcon: Icons.email_outlined,
-                          keyboardType: TextInputType.emailAddress,
+                          controller: _cedulaController,
+                          label: 'Cedula',
+                          hint: '1710034065',
+                          prefixIcon: Icons.badge_outlined,
+                          keyboardType: TextInputType.number,
                           validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Por favor ingresa tu correo';
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Ingresa tu cedula';
                             }
-                            if (!value.contains('@')) {
-                              return 'Por favor ingresa un correo válido';
+                            if (value.trim().length != 10) {
+                              return 'La cedula debe tener 10 digitos';
                             }
                             return null;
                           },
                         ),
                         const SizedBox(height: 16),
-
-                        // Password field
                         CustomTextField(
                           controller: _passwordController,
-                          label: 'Contraseña',
-                          hint: '••••••••',
+                          label: 'Contrasena',
+                          hint: '********',
                           prefixIcon: Icons.lock_outline,
                           isPassword: true,
                           validator: (value) {
                             if (value == null || value.isEmpty) {
-                              return 'Por favor ingresa tu contraseña';
-                            }
-                            if (value.length < 6) {
-                              return 'La contraseña debe tener al menos 6 caracteres';
+                              return 'Ingresa tu contrasena';
                             }
                             return null;
                           },
                         ),
                         const SizedBox(height: 8),
-
-                        // Forgot password
                         Align(
                           alignment: Alignment.centerRight,
                           child: TextButton(
@@ -146,7 +126,7 @@ class _LoginPageState extends State<LoginPage> {
                               );
                             },
                             child: Text(
-                              '¿Olvidaste tu contraseña?',
+                              'Olvide mi contrasena',
                               style: TextStyle(
                                 color: Theme.of(context).colorScheme.primary,
                                 fontWeight: FontWeight.w600,
@@ -155,42 +135,35 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                         ),
                         const SizedBox(height: 24),
-
-                        // Login button
                         SizedBox(
                           height: 56,
                           child: ElevatedButton(
                             onPressed: isLoading ? null : _handleSignIn,
-                            child: const Text('Iniciar sesión'),
+                            child: const Text('Iniciar sesion'),
                           ),
                         ),
                         const SizedBox(height: 24),
-
-                        // Register link
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              '¿No tienes cuenta?',
-                              style: Theme.of(context).textTheme.bodyMedium,
-                            ),
-                            TextButton(
-                              onPressed: () {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) => const RegisterPage(),
-                                  ),
-                                );
-                              },
-                              child: Text(
-                                'Regístrate',
-                                style: TextStyle(
+                        Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.info_outline,
                                   color: Theme.of(context).colorScheme.primary,
-                                  fontWeight: FontWeight.w600,
                                 ),
-                              ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    'Las cuentas las crea tu coordinador. '
+                                    'La contrasena inicial es Ecuador2026.',
+                                    style:
+                                        Theme.of(context).textTheme.bodyMedium,
+                                  ),
+                                ),
+                              ],
                             ),
-                          ],
+                          ),
                         ),
                       ],
                     ),

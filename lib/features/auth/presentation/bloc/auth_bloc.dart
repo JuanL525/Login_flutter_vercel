@@ -1,122 +1,98 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:injectable/injectable.dart';
 import '../../../../core/usecase/usecase.dart';
-import '../../domain/usecases/get_current_user.dart';
+import '../../domain/entities/session_entity.dart';
+import '../../domain/usecases/change_password.dart';
+import '../../domain/usecases/get_current_session.dart';
 import '../../domain/usecases/reset_password.dart';
 import '../../domain/usecases/sign_in.dart';
 import '../../domain/usecases/sign_out.dart';
-import '../../domain/usecases/sign_up.dart';
 import 'auth_event.dart';
 import 'auth_state.dart';
 
 @injectable
 class AuthBloc extends Bloc<AuthEvent, AuthState> {
   final SignIn signIn;
-  final SignUp signUp;
-  final ResetPassword resetPassword;
   final SignOut signOut;
-  final GetCurrentUser getCurrentUser;
+  final ResetPassword resetPassword;
+  final ChangePassword changePassword;
+  final GetCurrentSession getCurrentSession;
 
   AuthBloc({
     required this.signIn,
-    required this.signUp,
-    required this.resetPassword,
     required this.signOut,
-    required this.getCurrentUser,
+    required this.resetPassword,
+    required this.changePassword,
+    required this.getCurrentSession,
   }) : super(const AuthInitial()) {
-    on<SignInRequested>(_onSignInRequested);
-    on<SignUpRequested>(_onSignUpRequested);
-    on<ResetPasswordRequested>(_onResetPasswordRequested);
-    on<SignOutRequested>(_onSignOutRequested);
-    on<AuthCheckRequested>(_onAuthCheckRequested);
+    on<AuthCheckRequested>(_onCheck);
+    on<SignInRequested>(_onSignIn);
+    on<ResetPasswordRequested>(_onReset);
+    on<ChangePasswordRequested>(_onChangePassword);
+    on<SignOutRequested>(_onSignOut);
   }
 
-  Future<void> _onSignInRequested(
-    SignInRequested event,
-    Emitter<AuthState> emit,
-  ) async {
-    emit(const AuthLoading());
+  AuthState _resolve(SessionEntity session) {
+    if (session.profile.mustChangePassword) {
+      return AuthMustChangePassword(session);
+    }
+    return AuthAuthenticated(session);
+  }
 
+  Future<void> _onCheck(AuthCheckRequested e, Emitter<AuthState> emit) async {
+    emit(const AuthLoading());
+    final result = await getCurrentSession(NoParams());
+    result.fold(
+      (_) => emit(const AuthUnauthenticated()),
+      (session) => emit(
+        session == null ? const AuthUnauthenticated() : _resolve(session),
+      ),
+    );
+  }
+
+  Future<void> _onSignIn(SignInRequested e, Emitter<AuthState> emit) async {
+    emit(const AuthLoading());
     final result = await signIn(
-      SignInParams(
-        email: event.email,
-        password: event.password,
-      ),
+      SignInParams(cedula: e.cedula, password: e.password),
     );
-
     result.fold(
       (failure) => emit(AuthError(failure.message)),
-      (user) => emit(AuthAuthenticated(user)),
+      (session) => emit(_resolve(session)),
     );
   }
 
-  Future<void> _onSignUpRequested(
-    SignUpRequested event,
+  Future<void> _onReset(
+    ResetPasswordRequested e,
     Emitter<AuthState> emit,
   ) async {
     emit(const AuthLoading());
-
-    final result = await signUp(
-      SignUpParams(
-        email: event.email,
-        password: event.password,
-        displayName: event.displayName,
-      ),
-    );
-
-    result.fold(
-      (failure) => emit(AuthError(failure.message)),
-      (user) => emit(EmailVerificationRequired(event.email)),
-    );
-  }
-
-  Future<void> _onResetPasswordRequested(
-    ResetPasswordRequested event,
-    Emitter<AuthState> emit,
-  ) async {
-    emit(const AuthLoading());
-
-    final result = await resetPassword(
-      ResetPasswordParams(email: event.email),
-    );
-
+    final result = await resetPassword(ResetPasswordParams(email: e.email));
     result.fold(
       (failure) => emit(AuthError(failure.message)),
       (_) => emit(const ResetPasswordSent()),
     );
   }
 
-  Future<void> _onSignOutRequested(
-    SignOutRequested event,
+  Future<void> _onChangePassword(
+    ChangePasswordRequested e,
     Emitter<AuthState> emit,
   ) async {
     emit(const AuthLoading());
-
-    final result = await signOut(NoParams());
-
+    final result = await changePassword(
+      ChangePasswordParams(newPassword: e.newPassword),
+    );
     result.fold(
       (failure) => emit(AuthError(failure.message)),
-      (_) => emit(const AuthUnauthenticated()),
+      (session) => emit(AuthAuthenticated(session)),
     );
   }
 
-  Future<void> _onAuthCheckRequested(
-    AuthCheckRequested event,
-    Emitter<AuthState> emit,
-  ) async {
+  Future<void> _onSignOut(SignOutRequested e, Emitter<AuthState> emit) async {
     emit(const AuthLoading());
-
-    final result = await getCurrentUser(NoParams());
-
+    final result = await signOut(NoParams());
     result.fold(
-      (failure) => emit(const AuthUnauthenticated()),
-      (user) {
-        if (user != null) {
-          emit(AuthAuthenticated(user));
-        } else {
-          emit(const AuthUnauthenticated());
-        }
-      },
+      (failure) => emit(AuthError(failure.message)),
+      (_) => emit(const AuthUnauthenticated()),
     );
   }
 }

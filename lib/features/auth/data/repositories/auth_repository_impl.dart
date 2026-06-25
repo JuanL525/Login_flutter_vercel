@@ -2,7 +2,7 @@ import 'package:dartz/dartz.dart';
 import 'package:injectable/injectable.dart';
 import '../../../../core/error/failures.dart';
 import '../../../../core/network/network_info.dart';
-import '../../domain/entities/user_entity.dart';
+import '../../domain/entities/session_entity.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../datasources/auth_remote_data_source.dart';
 
@@ -17,44 +17,21 @@ class AuthRepositoryImpl implements AuthRepository {
   });
 
   @override
-  Future<Either<Failure, UserEntity>> signInWithEmailAndPassword({
-    required String email,
+  Future<Either<Failure, SessionEntity>> signInWithCedula({
+    required String cedula,
     required String password,
   }) async {
     if (!await networkInfo.isConnected) {
-      return const Left(NetworkFailure('Sin conexión a internet'));
+      return const Left(NetworkFailure('Sin conexion a internet'));
     }
-
     try {
-      final user = await remoteDataSource.signInWithEmailAndPassword(
-        email: email,
+      final profile = await remoteDataSource.signInWithCedula(
+        cedula: cedula,
         password: password,
       );
-      return Right(user);
+      return Right(SessionEntity(profile: profile));
     } catch (e) {
-      return Left(AuthFailure(e.toString()));
-    }
-  }
-
-  @override
-  Future<Either<Failure, UserEntity>> signUpWithEmailAndPassword({
-    required String email,
-    required String password,
-    String? displayName,
-  }) async {
-    if (!await networkInfo.isConnected) {
-      return const Left(NetworkFailure('Sin conexión a internet'));
-    }
-
-    try {
-      final user = await remoteDataSource.signUpWithEmailAndPassword(
-        email: email,
-        password: password,
-        displayName: displayName,
-      );
-      return Right(user);
-    } catch (e) {
-      return Left(AuthFailure(e.toString()));
+      return Left(AuthFailure(_clean(e)));
     }
   }
 
@@ -63,14 +40,30 @@ class AuthRepositoryImpl implements AuthRepository {
     required String email,
   }) async {
     if (!await networkInfo.isConnected) {
-      return const Left(NetworkFailure('Sin conexión a internet'));
+      return const Left(NetworkFailure('Sin conexion a internet'));
     }
-
     try {
       await remoteDataSource.sendPasswordResetEmail(email: email);
       return const Right(null);
     } catch (e) {
-      return Left(AuthFailure(e.toString()));
+      return Left(AuthFailure(_clean(e)));
+    }
+  }
+
+  @override
+  Future<Either<Failure, SessionEntity>> changePassword({
+    required String newPassword,
+  }) async {
+    if (!await networkInfo.isConnected) {
+      return const Left(NetworkFailure('Sin conexion a internet'));
+    }
+    try {
+      final profile = await remoteDataSource.changePassword(
+        newPassword: newPassword,
+      );
+      return Right(SessionEntity(profile: profile));
+    } catch (e) {
+      return Left(AuthFailure(_clean(e)));
     }
   }
 
@@ -80,22 +73,21 @@ class AuthRepositoryImpl implements AuthRepository {
       await remoteDataSource.signOut();
       return const Right(null);
     } catch (e) {
-      return Left(AuthFailure(e.toString()));
+      return Left(AuthFailure(_clean(e)));
     }
   }
 
   @override
-  Future<Either<Failure, UserEntity?>> getCurrentUser() async {
+  Future<Either<Failure, SessionEntity?>> getCurrentSession() async {
     try {
-      final user = await remoteDataSource.getCurrentUser();
-      return Right(user);
+      final profile = await remoteDataSource.getCurrentProfile();
+      if (profile == null) return const Right(null);
+      return Right(SessionEntity(profile: profile));
     } catch (e) {
-      return Left(AuthFailure(e.toString()));
+      return Left(AuthFailure(_clean(e)));
     }
   }
 
-  @override
-  Stream<UserEntity?> get authStateChanges {
-    return remoteDataSource.authStateChanges;
-  }
+  String _clean(Object e) =>
+      e.toString().replaceFirst('Exception: ', '').trim();
 }

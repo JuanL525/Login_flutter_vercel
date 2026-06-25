@@ -24,3 +24,15 @@ class NetworkFailure extends Failure {
 class CacheFailure extends Failure {
   const CacheFailure(super.message);
 }
+
+class ValidationFailure extends Failure {
+  const ValidationFailure(super.message);
+}
+
+class PermissionFailure extends Failure {
+  const PermissionFailure(super.message);
+}
+
+class ImageQualityFailure extends Failure {
+  const ImageQualityFailure(super.message);
+}
