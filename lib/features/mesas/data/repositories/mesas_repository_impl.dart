@@ -20,6 +20,9 @@ class MesasRepositoryImpl implements MesasRepository {
   Future<Either<Failure, List<MesaEntity>>> getMesasByRecinto(
     String recintoId,
   ) async {
+    if (!await networkInfo.isConnected) {
+      return const Left(NetworkFailure('Sin conexión a internet'));
+    }
     try {
       return Right(await remoteDataSource.getMesasByRecinto(recintoId));
     } catch (e) {
@@ -31,6 +34,9 @@ class MesasRepositoryImpl implements MesasRepository {
   Future<Either<Failure, List<MesaEntity>>> getMesasByVeedor(
     String veedorId,
   ) async {
+    if (!await networkInfo.isConnected) {
+      return const Left(NetworkFailure('Sin conexión a internet'));
+    }
     try {
       return Right(await remoteDataSource.getMesasByVeedor(veedorId));
     } catch (e) {

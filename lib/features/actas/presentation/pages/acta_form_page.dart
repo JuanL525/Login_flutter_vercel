@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:uuid/uuid.dart';
 import '../../../../core/constants/enums.dart';
 import '../../../../core/seeds/organizaciones_seed.dart';
+import '../../../../core/services/blur_detector.dart';
 import '../../../../core/services/gps_service.dart';
 import '../../../../core/services/photo_capture_service.dart';
 import '../../../../injection_container.dart';
@@ -147,7 +148,7 @@ class _ActaFormPageState extends State<ActaFormPage> {
     }
   }
 
-  void _save() {
+  Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
 
     final authState = context.read<AuthBloc>().state;
@@ -198,6 +199,26 @@ class _ActaFormPageState extends State<ActaFormPage> {
       return;
     }
 
+    // Revalidar nitidez al guardar (por si la foto se corrompio o es antigua).
+    if (_fotoLocalPath != null && File(_fotoLocalPath!).existsSync()) {
+      final bytes = await File(_fotoLocalPath!).readAsBytes();
+      final blur = getIt<BlurDetector>().analyze(bytes);
+      if (!blur.isSharp) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'La foto no cumple el minimo de nitidez. '
+              'Vuelva a tomarla antes de guardar.',
+            ),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return;
+      }
+    }
+
+    if (!mounted) return;
     context.read<ActasBloc>().add(SaveActaRequested(acta));
   }
 
@@ -205,7 +226,7 @@ class _ActaFormPageState extends State<ActaFormPage> {
   Widget build(BuildContext context) {
     final total = _toInt(_totalCtrl.text);
     final suma = _suma;
-    final exceso = suma > total && total > 0;
+    final exceso = total > 0 && suma != total;
 
     return Scaffold(
       appBar: AppBar(
@@ -271,10 +292,12 @@ class _ActaFormPageState extends State<ActaFormPage> {
                           ),
                           const SizedBox(width: 12),
                           Expanded(
-                            child: Text(
+                            child:                           Text(
                               exceso
-                                  ? 'La suma ($suma) supera el total ($total)'
-                                  : 'Suma contabilizada: $suma / $total',
+                                  ? 'La suma ($suma) debe ser igual al total ($total)'
+                                  : total > 0
+                                      ? 'Suma contabilizada: $suma / $total ✓'
+                                      : 'Suma contabilizada: $suma',
                             ),
                           ),
                         ],
@@ -371,7 +394,10 @@ class _ActaFormPageState extends State<ActaFormPage> {
           ),
         const SizedBox(height: 8),
         if (_sharpness != null)
-          Text('Nitidez: ${_sharpness!.toStringAsFixed(0)}'),
+          Text(
+            'Nitidez (Laplaciano): ${_sharpness!.toStringAsFixed(0)} '
+            '(min ${BlurDetector.minLaplacianVariance.toStringAsFixed(0)})',
+          ),
         if (_lat != null && _lng != null)
           Text(
             'GPS: ${_lat!.toStringAsFixed(5)}, ${_lng!.toStringAsFixed(5)}',

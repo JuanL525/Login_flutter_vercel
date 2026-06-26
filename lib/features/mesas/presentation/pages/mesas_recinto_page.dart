@@ -5,10 +5,13 @@ import '../../../../injection_container.dart';
 import '../../../actas/presentation/pages/mesa_actas_page.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_event.dart';
+import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../../recintos/domain/entities/recinto_entity.dart';
 import '../../../recintos/presentation/pages/recinto_form_page.dart';
 import '../../../users/domain/entities/profile_entity.dart';
 import '../../../users/presentation/pages/create_user_page.dart';
+import '../../../../features/dashboard/presentation/widgets/identity_banner.dart';
+import '../../../../features/dashboard/presentation/widgets/identity_context.dart';
 import '../../domain/entities/mesa_entity.dart';
 import '../bloc/mesas_bloc.dart';
 
@@ -22,14 +25,12 @@ class MesasRecintoPage extends StatelessWidget {
   /// Cuando se usa como home del coordinador: muestra logout y edicion de su
   /// propio recinto.
   final bool isHome;
-  final RecintoEntity? recintoForEdit;
 
   const MesasRecintoPage({
     super.key,
     required this.recintoId,
     this.canManage = true,
     this.isHome = false,
-    this.recintoForEdit,
   });
 
   @override
@@ -40,41 +41,79 @@ class MesasRecintoPage extends StatelessWidget {
         recintoId: recintoId,
         canManage: canManage,
         isHome: isHome,
-        recintoForEdit: recintoForEdit,
       ),
     );
   }
 }
 
-class _MesasView extends StatelessWidget {
+class _MesasView extends StatefulWidget {
   final String recintoId;
   final bool canManage;
   final bool isHome;
-  final RecintoEntity? recintoForEdit;
   const _MesasView({
     required this.recintoId,
     required this.canManage,
     required this.isHome,
-    this.recintoForEdit,
   });
 
   @override
+  State<_MesasView> createState() => _MesasViewState();
+}
+
+class _MesasViewState extends State<_MesasView> {
+  RecintoEntity? _recinto;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.isHome) _reloadRecinto();
+  }
+
+  Future<void> _reloadRecinto() async {
+    final recinto = await IdentityContext.recintoById(widget.recintoId);
+    if (mounted) setState(() => _recinto = recinto);
+  }
+
+  Future<void> _refreshAll() async {
+    context.read<MesasBloc>().add(LoadMesasByRecinto(widget.recintoId));
+    if (widget.isHome) await _reloadRecinto();
+  }
+
+  ProfileEntity? _profile(BuildContext context) {
+    final state = context.read<AuthBloc>().state;
+    if (state is AuthAuthenticated) return state.session.profile;
+    return null;
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final r = _recinto;
     return Scaffold(
       appBar: AppBar(
-        title: Text(isHome ? 'Mi recinto' : 'Mesas del recinto'),
+        title: Text(
+          widget.isHome ? (r?.nombre ?? 'Mi recinto') : 'Mesas del recinto',
+        ),
         actions: [
-          if (isHome && recintoForEdit != null)
+          if (widget.isHome)
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              tooltip: 'Recargar',
+              onPressed: _refreshAll,
+            ),
+          if (widget.isHome && r != null)
             IconButton(
               icon: const Icon(Icons.edit_location_alt_outlined),
               tooltip: 'Editar recinto',
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => RecintoFormPage(recinto: recintoForEdit),
-                ),
-              ),
+              onPressed: () async {
+                final ok = await Navigator.of(context).push<bool>(
+                  MaterialPageRoute(
+                    builder: (_) => RecintoFormPage(recinto: r),
+                  ),
+                );
+                if (ok == true && mounted) await _refreshAll();
+              },
             ),
-          if (isHome)
+          if (widget.isHome)
             IconButton(
               icon: const Icon(Icons.logout),
               onPressed: () =>
@@ -82,7 +121,7 @@ class _MesasView extends StatelessWidget {
             ),
         ],
       ),
-      floatingActionButton: canManage
+      floatingActionButton: widget.canManage
           ? FloatingActionButton.extended(
               onPressed: () async {
                 final created = await Navigator.of(context).push<bool>(
@@ -90,65 +129,93 @@ class _MesasView extends StatelessWidget {
                     builder: (_) => CreateUserPage(
                       role: UserRole.veedor,
                       title: 'Nuevo veedor',
-                      recintoId: recintoId,
+                      recintoId: widget.recintoId,
                     ),
                   ),
                 );
-                if (created == true && context.mounted) {
+                if (created == true && mounted) {
                   context
                       .read<MesasBloc>()
-                      .add(LoadMesasByRecinto(recintoId));
+                      .add(LoadMesasByRecinto(widget.recintoId));
                 }
               },
               icon: const Icon(Icons.person_add_alt),
               label: const Text('Crear veedor'),
             )
           : null,
-      body: BlocConsumer<MesasBloc, MesasState>(
-        listener: (context, state) {
-          if (state is MesasError) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: Theme.of(context).colorScheme.error,
-              ),
-            );
-          }
-        },
-        builder: (context, state) {
-          if (state is MesasLoading || state is MesasInitial) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (state is MesasError) {
-            return _ErrorView(
-              message: state.message,
-              onRetry: () =>
-                  context.read<MesasBloc>().add(LoadMesasByRecinto(recintoId)),
-            );
-          }
-          final loaded = state as MesasLoaded;
-          if (loaded.mesas.isEmpty) {
-            return const Center(child: Text('No hay mesas en este recinto'));
-          }
-          return RefreshIndicator(
-            onRefresh: () async =>
-                context.read<MesasBloc>().add(LoadMesasByRecinto(recintoId)),
-            child: ListView.separated(
-              padding: const EdgeInsets.all(16),
-              itemCount: loaded.mesas.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 12),
-              itemBuilder: (context, i) {
-                final mesa = loaded.mesas[i];
-                return _MesaCard(
-                  mesa: mesa,
-                  canManage: canManage,
-                  veedores: loaded.veedores,
-                  recintoId: recintoId,
+      body: Column(
+        children: [
+          if (widget.isHome) ...[
+            Builder(
+              builder: (context) {
+                final profile = _profile(context);
+                if (profile == null) return const SizedBox.shrink();
+                return IdentityBanner(
+                  profile: profile,
+                  recintoNombre: r?.nombre,
+                  recintoUbicacion:
+                      r != null ? '${r.parroquia}, ${r.canton}' : null,
                 );
               },
             ),
-          );
-        },
+          ],
+          Expanded(
+            child: BlocConsumer<MesasBloc, MesasState>(
+              listener: (context, state) {
+                if (state is MesasError) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(state.message),
+                      backgroundColor: Theme.of(context).colorScheme.error,
+                    ),
+                  );
+                }
+              },
+              builder: (context, state) {
+                if (state is MesasLoading || state is MesasInitial) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (state is MesasError) {
+                  return _ErrorView(
+                    message: state.message,
+                    onRetry: _refreshAll,
+                  );
+                }
+                final loaded = state as MesasLoaded;
+                if (loaded.mesas.isEmpty) {
+                  return RefreshIndicator(
+                    onRefresh: _refreshAll,
+                    child: ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      children: const [
+                        SizedBox(height: 120),
+                        Center(child: Text('No hay mesas en este recinto')),
+                      ],
+                    ),
+                  );
+                }
+                return RefreshIndicator(
+                  onRefresh: _refreshAll,
+                  child: ListView.separated(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.all(16),
+                    itemCount: loaded.mesas.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 12),
+                    itemBuilder: (context, i) {
+                      final mesa = loaded.mesas[i];
+                      return _MesaCard(
+                        mesa: mesa,
+                        canManage: widget.canManage,
+                        veedores: loaded.veedores,
+                        recintoId: widget.recintoId,
+                      );
+                    },
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }

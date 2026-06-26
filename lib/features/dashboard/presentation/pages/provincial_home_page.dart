@@ -4,11 +4,14 @@ import '../../../../core/constants/enums.dart';
 import '../../../../injection_container.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_event.dart';
+import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../../mesas/presentation/pages/mesas_recinto_page.dart';
 import '../../../recintos/presentation/pages/recinto_form_page.dart';
+import '../../../users/domain/entities/profile_entity.dart';
 import '../../../users/presentation/pages/create_user_page.dart';
 import '../../domain/entities/recinto_avance.dart';
 import '../bloc/dashboard_bloc.dart';
+import '../widgets/identity_banner_host.dart';
 
 class ProvincialHomePage extends StatelessWidget {
   const ProvincialHomePage({super.key});
@@ -22,8 +25,36 @@ class ProvincialHomePage extends StatelessWidget {
   }
 }
 
-class _ProvincialView extends StatelessWidget {
+class _ProvincialView extends StatefulWidget {
   const _ProvincialView();
+
+  @override
+  State<_ProvincialView> createState() => _ProvincialViewState();
+}
+
+class _ProvincialViewState extends State<_ProvincialView> {
+  int _identityRefresh = 0;
+
+  ProfileEntity? _profile(BuildContext context) {
+    final state = context.read<AuthBloc>().state;
+    if (state is AuthAuthenticated) return state.session.profile;
+    return null;
+  }
+
+  void _refreshAll() {
+    context.read<DashboardBloc>().add(const LoadProvincialAvance());
+    setState(() => _identityRefresh++);
+  }
+
+  Widget _buildBanner(BuildContext context) {
+    final profile = _profile(context);
+    if (profile == null) return const SizedBox.shrink();
+    return IdentityBannerHost(
+      profile: profile,
+      loadProvincia: true,
+      refreshGeneration: _identityRefresh,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -31,6 +62,11 @@ class _ProvincialView extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Coordinacion Provincial'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Recargar',
+            onPressed: _refreshAll,
+          ),
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () =>
@@ -44,56 +80,71 @@ class _ProvincialView extends StatelessWidget {
             MaterialPageRoute(builder: (_) => const RecintoFormPage()),
           );
           if (created == true && context.mounted) {
-            context.read<DashboardBloc>().add(const LoadProvincialAvance());
+            _refreshAll();
           }
         },
         icon: const Icon(Icons.add_location_alt),
         label: const Text('Nuevo recinto'),
       ),
-      body: BlocBuilder<DashboardBloc, DashboardState>(
-        builder: (context, state) {
-          if (state is DashboardLoading) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (state is DashboardError) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.error_outline, size: 48, color: Colors.red),
-                  const SizedBox(height: 12),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 32),
-                    child: Text(state.message, textAlign: TextAlign.center),
+      body: Column(
+        children: [
+          _buildBanner(context),
+          Expanded(
+            child: BlocBuilder<DashboardBloc, DashboardState>(
+              builder: (context, state) {
+                if (state is DashboardLoading) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (state is DashboardError) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(
+                          Icons.error_outline,
+                          size: 48,
+                          color: Colors.red,
+                        ),
+                        const SizedBox(height: 12),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 32),
+                          child: Text(
+                            state.message,
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        ElevatedButton(
+                          onPressed: _refreshAll,
+                          child: const Text('Reintentar'),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+                final loaded = state as DashboardLoaded;
+                if (loaded.avances.isEmpty) {
+                  return const Center(
+                    child: Text('No hay recintos registrados'),
+                  );
+                }
+                return RefreshIndicator(
+                  onRefresh: () async => _refreshAll(),
+                  child: ListView.separated(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.all(16),
+                    itemCount: loaded.avances.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 12),
+                    itemBuilder: (context, i) => _RecintoCard(
+                      avance: loaded.avances[i],
+                      onChanged: _refreshAll,
+                    ),
                   ),
-                  const SizedBox(height: 12),
-                  ElevatedButton(
-                    onPressed: () => context
-                        .read<DashboardBloc>()
-                        .add(const LoadProvincialAvance()),
-                    child: const Text('Reintentar'),
-                  ),
-                ],
-              ),
-            );
-          }
-          final loaded = state as DashboardLoaded;
-          if (loaded.avances.isEmpty) {
-            return const Center(child: Text('No hay recintos registrados'));
-          }
-          return RefreshIndicator(
-            onRefresh: () async => context
-                .read<DashboardBloc>()
-                .add(const LoadProvincialAvance()),
-            child: ListView.separated(
-              padding: const EdgeInsets.all(16),
-              itemCount: loaded.avances.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 12),
-              itemBuilder: (context, i) =>
-                  _RecintoCard(avance: loaded.avances[i]),
+                );
+              },
             ),
-          );
-        },
+          ),
+        ],
       ),
     );
   }
@@ -101,10 +152,8 @@ class _ProvincialView extends StatelessWidget {
 
 class _RecintoCard extends StatelessWidget {
   final RecintoAvance avance;
-  const _RecintoCard({required this.avance});
-
-  void _refresh(BuildContext context) =>
-      context.read<DashboardBloc>().add(const LoadProvincialAvance());
+  final VoidCallback onChanged;
+  const _RecintoCard({required this.avance, required this.onChanged});
 
   @override
   Widget build(BuildContext context) {
@@ -134,7 +183,7 @@ class _RecintoCard extends StatelessWidget {
                           builder: (_) => RecintoFormPage(recinto: recinto),
                         ),
                       );
-                      if (ok == true && context.mounted) _refresh(context);
+                      if (ok == true && context.mounted) onChanged();
                     } else if (value == 'coordinador') {
                       final ok = await Navigator.of(context).push<bool>(
                         MaterialPageRoute(
@@ -145,7 +194,7 @@ class _RecintoCard extends StatelessWidget {
                           ),
                         ),
                       );
-                      if (ok == true && context.mounted) _refresh(context);
+                      if (ok == true && context.mounted) onChanged();
                     }
                   },
                   itemBuilder: (_) => [

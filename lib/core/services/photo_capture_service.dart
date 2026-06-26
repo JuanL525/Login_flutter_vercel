@@ -18,12 +18,15 @@ class CapturedPhoto {
 }
 
 class BlurryPhotoException implements Exception {
-  final double variance;
-  BlurryPhotoException(this.variance);
+  final BlurResult result;
+  BlurryPhotoException(this.result);
   @override
   String toString() =>
-      'La foto esta borrosa (nitidez ${variance.toStringAsFixed(1)}). '
-      'Tomela nuevamente.';
+      'La foto esta borrosa. Sosten el telefono firme y enfoca el acta. '
+      '(Laplaciano: ${result.laplacianVariance.toStringAsFixed(0)}, '
+      'min ${BlurDetector.minLaplacianVariance.toStringAsFixed(0)}; '
+      'bordes: ${(result.edgeRatio * 100).toStringAsFixed(1)}%, '
+      'min ${(BlurDetector.minEdgeRatio * 100).toStringAsFixed(0)}%)';
 }
 
 /// Orquesta la captura de la foto del acta:
@@ -45,15 +48,15 @@ class PhotoCaptureService {
   }) async {
     final xfile = await _picker.pickImage(
       source: source,
-      imageQuality: 90,
-      maxWidth: 2000,
+      imageQuality: 100,
+      maxWidth: 2400,
     );
     if (xfile == null) return null;
 
     final bytes = await xfile.readAsBytes();
     final blur = _blurDetector.analyze(bytes);
     if (!blur.isSharp) {
-      throw BlurryPhotoException(blur.variance);
+      throw BlurryPhotoException(blur);
     }
 
     final dir = await getApplicationDocumentsDirectory();

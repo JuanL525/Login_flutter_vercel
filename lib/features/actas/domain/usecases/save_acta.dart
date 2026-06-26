@@ -36,9 +36,9 @@ class SaveActa implements UseCase<ActaEntity, ActaEntity> {
         return 'Una organizacion tiene mas votos que el total de sufragantes';
       }
     }
-    if (acta.votosContabilizados > acta.totalSufragantes) {
-      return 'La suma de votos (${acta.votosContabilizados}) supera el total '
-          'de sufragantes (${acta.totalSufragantes})';
+    if (acta.votosContabilizados != acta.totalSufragantes) {
+      return 'La suma de votos (${acta.votosContabilizados}) debe ser igual al '
+          'total de sufragantes (${acta.totalSufragantes})';
     }
     if (acta.fotoLocalPath == null && acta.fotoPath == null) {
       return 'Debe adjuntar la foto del acta';

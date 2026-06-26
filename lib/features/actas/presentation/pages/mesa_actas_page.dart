@@ -48,7 +48,17 @@ class _MesaActasView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Mesa $numeroJrv - Actas')),
+      appBar: AppBar(
+        title: Text('Mesa $numeroJrv - Actas'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Recargar',
+            onPressed: () =>
+                context.read<ActasBloc>().add(LoadActas(mesaId)),
+          ),
+        ],
+      ),
       body: BlocConsumer<ActasBloc, ActasState>(
         listener: (context, state) {
           if (state is ActasError) {
