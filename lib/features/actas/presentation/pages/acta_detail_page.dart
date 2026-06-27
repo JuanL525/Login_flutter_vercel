@@ -40,11 +40,34 @@ class _ActaDetailPageState extends State<ActaDetailPage> {
   Future<void> _openMaps() async {
     final acta = widget.acta;
     if (acta.gpsLat == null || acta.gpsLng == null) return;
-    final uri = Uri.parse(
-      'https://www.google.com/maps/search/?api=1&query=${acta.gpsLat},${acta.gpsLng}',
+    final lat = acta.gpsLat!;
+    final lng = acta.gpsLng!;
+
+    // Intentar abrir la app de Google Maps nativa primero (geo:).
+    // Si no está instalada o falla, caer a la URL web.
+    final geoUri = Uri.parse('geo:$lat,$lng?q=$lat,$lng(Acta)');
+    final webUri = Uri.parse(
+      'https://www.google.com/maps/search/?api=1&query=$lat,$lng',
     );
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
+
+    bool launched = false;
+    try {
+      if (await canLaunchUrl(geoUri)) {
+        launched = await launchUrl(geoUri, mode: LaunchMode.externalApplication);
+      }
+      if (!launched) {
+        launched = await launchUrl(webUri, mode: LaunchMode.externalApplication);
+      }
+    } catch (_) {
+      launched = false;
+    }
+
+    if (!launched && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No se pudo abrir el mapa. Verifica que tienes una app de mapas instalada.'),
+        ),
+      );
     }
   }
 

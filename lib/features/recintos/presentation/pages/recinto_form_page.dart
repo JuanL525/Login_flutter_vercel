@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../core/widgets/user_message_dialog.dart';
 import '../../../../injection_container.dart';
 import '../../../auth/presentation/widgets/custom_text_field.dart';
 import '../../../auth/presentation/widgets/loading_overlay.dart';
@@ -34,6 +35,7 @@ class _RecintoFormViewState extends State<_RecintoFormView> {
   late final TextEditingController _canton;
   late final TextEditingController _parroquia;
   late final TextEditingController _nombre;
+  late final TextEditingController _cantidadMesas;
 
   bool get _isEdit => widget.recinto != null;
 
@@ -45,6 +47,7 @@ class _RecintoFormViewState extends State<_RecintoFormView> {
     _canton = TextEditingController(text: widget.recinto?.canton ?? 'Quito');
     _parroquia = TextEditingController(text: widget.recinto?.parroquia ?? '');
     _nombre = TextEditingController(text: widget.recinto?.nombre ?? '');
+    _cantidadMesas = TextEditingController(text: '4');
   }
 
   @override
@@ -53,11 +56,13 @@ class _RecintoFormViewState extends State<_RecintoFormView> {
     _canton.dispose();
     _parroquia.dispose();
     _nombre.dispose();
+    _cantidadMesas.dispose();
     super.dispose();
   }
 
   void _submit() {
     if (_formKey.currentState!.validate()) {
+      final mesas = _isEdit ? 0 : (int.tryParse(_cantidadMesas.text.trim()) ?? 0);
       context.read<RecintosBloc>().add(
             SaveRecintoRequested(
               id: widget.recinto?.id,
@@ -65,6 +70,7 @@ class _RecintoFormViewState extends State<_RecintoFormView> {
               canton: _canton.text.trim(),
               parroquia: _parroquia.text.trim(),
               nombre: _nombre.text.trim(),
+              cantidadMesas: mesas,
             ),
           );
     }
@@ -77,16 +83,24 @@ class _RecintoFormViewState extends State<_RecintoFormView> {
         title: Text(_isEdit ? 'Editar recinto' : 'Nuevo recinto'),
       ),
       body: BlocConsumer<RecintosBloc, RecintosState>(
-        listener: (context, state) {
+        listener: (context, state) async {
           if (state is RecintosError) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: Theme.of(context).colorScheme.error,
-              ),
+            await UserMessageDialog.showError(
+              context,
+              title: 'No se pudo guardar',
+              message: state.message,
             );
           } else if (state is RecintoSaved) {
-            Navigator.of(context).pop(true);
+            final mesas = int.tryParse(_cantidadMesas.text.trim()) ?? 0;
+            await UserMessageDialog.showSuccess(
+              context,
+              title: _isEdit ? 'Recinto actualizado' : 'Recinto creado',
+              message: _isEdit
+                  ? 'Los datos del recinto se guardaron correctamente.'
+                  : 'El recinto fue registrado con $mesas mesa${mesas == 1 ? '' : 's'} (JRV).',
+              buttonText: 'Listo',
+            );
+            if (context.mounted) Navigator.of(context).pop(true);
           }
         },
         builder: (context, state) {
@@ -132,12 +146,37 @@ class _RecintoFormViewState extends State<_RecintoFormView> {
                         prefixIcon: Icons.school_outlined,
                         validator: _required,
                       ),
+                      if (!_isEdit) ...[
+                        const SizedBox(height: 16),
+                        CustomTextField(
+                          controller: _cantidadMesas,
+                          label: 'Cantidad de mesas (JRV)',
+                          hint: '4',
+                          prefixIcon: Icons.table_rows_outlined,
+                          keyboardType: TextInputType.number,
+                          validator: (v) {
+                            if (v == null || v.trim().isEmpty) {
+                              return 'Ingrese la cantidad de mesas';
+                            }
+                            final n = int.tryParse(v.trim());
+                            if (n == null || n < 1 || n > 50) {
+                              return 'Debe ser un numero entre 1 y 50';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Se crearan mesas numeradas del 1 al valor indicado.',
+                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                        ),
+                      ],
                       const SizedBox(height: 24),
                       SizedBox(
                         height: 56,
                         child: ElevatedButton(
                           onPressed: isLoading ? null : _submit,
-                          child: Text(_isEdit ? 'Guardar cambios' : 'Crear'),
+                          child: Text(_isEdit ? 'Guardar cambios' : 'Crear recinto con mesas'),
                         ),
                       ),
                     ],

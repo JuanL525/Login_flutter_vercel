@@ -129,6 +129,24 @@ Deno.serve(async (req: Request) => {
     return json({ error: "Rol sin permiso para crear usuarios" }, 403);
   }
 
+  // Un recinto solo puede tener un coordinador (asignacion inicial, sin reemplazo).
+  if (role === "recinto" && recinto_id) {
+    const { data: recintoTarget, error: recintoErr } = await admin
+      .from("recintos")
+      .select("coordinador_id")
+      .eq("id", recinto_id)
+      .single();
+    if (recintoErr || !recintoTarget) {
+      return json({ error: "Recinto no encontrado" }, 404);
+    }
+    if (recintoTarget.coordinador_id) {
+      return json(
+        { error: "Este recinto ya tiene un coordinador asignado" },
+        409,
+      );
+    }
+  }
+
   // Unicidad: un correo pertenece a un unico rol/usuario.
   const { data: existingEmail } = await admin
     .from("profiles")
@@ -149,15 +167,33 @@ Deno.serve(async (req: Request) => {
     return json({ error: "La cedula ya esta registrada" }, 409);
   }
 
-  // Crear usuario en Auth.
+  // 1. Crear usuario en Auth sin confirmar el email.
   const { data: created, error: createErr } = await admin.auth.admin.createUser({
     email,
     password: INITIAL_PASSWORD,
-    email_confirm: true,
+    email_confirm: false,
     user_metadata: { display_name: `${nombres} ${apellidos}` },
   });
   if (createErr || !created.user) {
     return json({ error: createErr?.message ?? "No se pudo crear el usuario" }, 400);
+  }
+
+  // 2. Enviar el correo de confirmacion usando el SMTP configurado en Supabase.
+  //    resend() con type='signup' dispara el flujo de confirmacion igual que
+  //    cuando un usuario se registra directamente (usa la plantilla de email
+  //    "Confirm signup" del dashboard de Supabase).
+  const { error: resendErr } = await admin.auth.resend({
+    type: "signup",
+    email,
+    options: {
+      emailRedirectTo: "https://loginfluttervercel.vercel.app/verify-email",
+    },
+  });
+  if (resendErr) {
+    // Si el correo no se pudo enviar, eliminamos el usuario para no dejar
+    // cuentas huerfanas y retornamos el error.
+    await admin.auth.admin.deleteUser(created.user.id);
+    return json({ error: `Usuario creado pero no se pudo enviar el correo: ${resendErr.message}` }, 500);
   }
 
   // Insertar profile.
@@ -181,17 +217,27 @@ Deno.serve(async (req: Request) => {
 
   // Si es coordinador de recinto, asignarlo como coordinador del recinto.
   if (role === "recinto" && recinto_id) {
-    const { error: assignErr } = await admin
+    const { data: assigned, error: assignErr } = await admin
       .from("recintos")
       .update({ coordinador_id: created.user.id })
-      .eq("id", recinto_id);
-    if (assignErr) {
+      .eq("id", recinto_id)
+      .is("coordinador_id", null)
+      .select("id")
+      .maybeSingle();
+    if (assignErr || !assigned) {
+      await admin.from("profiles").delete().eq("id", created.user.id);
+      await admin.auth.admin.deleteUser(created.user.id);
       return json(
-        { warning: "Usuario creado pero no se pudo asignar al recinto", id: created.user.id },
-        207,
+        { error: "Este recinto ya tiene un coordinador asignado" },
+        409,
       );
     }
   }
 
-  return json({ id: created.user.id, email, role }, 201);
+  return json({
+    id: created.user.id,
+    email,
+    role,
+    emailVerificationSent: true,
+  }, 201);
 });

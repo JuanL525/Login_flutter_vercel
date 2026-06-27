@@ -23,6 +23,7 @@ class SaveRecintoRequested extends RecintosEvent {
   final String canton;
   final String parroquia;
   final String nombre;
+  final int cantidadMesas;
 
   const SaveRecintoRequested({
     this.id,
@@ -30,10 +31,11 @@ class SaveRecintoRequested extends RecintosEvent {
     required this.canton,
     required this.parroquia,
     required this.nombre,
+    this.cantidadMesas = 0,
   });
 
   @override
-  List<Object?> get props => [id, provincia, canton, parroquia, nombre];
+  List<Object?> get props => [id, provincia, canton, parroquia, nombre, cantidadMesas];
 }
 
 // ----- Estados -----
@@ -101,6 +103,7 @@ class RecintosBloc extends Bloc<RecintosEvent, RecintosState> {
         canton: e.canton,
         parroquia: e.parroquia,
         nombre: e.nombre,
+        cantidadMesas: e.cantidadMesas,
       ),
     );
     result.fold(

@@ -58,6 +58,35 @@ class UsersRepositoryImpl implements UsersRepository {
     }
   }
 
+  @override
+  Future<Either<Failure, List<ProfileEntity>>> getCoordinadoresSinRecinto() async {
+    try {
+      final list = await remoteDataSource.getCoordinadoresSinRecinto();
+      return Right(list);
+    } catch (e) {
+      return Left(ServerFailure(_clean(e)));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> assignCoordinadorToRecinto({
+    required String coordinadorId,
+    required String recintoId,
+  }) async {
+    if (!await networkInfo.isConnected) {
+      return const Left(NetworkFailure('Sin conexion a internet'));
+    }
+    try {
+      await remoteDataSource.assignCoordinadorToRecinto(
+        coordinadorId: coordinadorId,
+        recintoId: recintoId,
+      );
+      return const Right(null);
+    } catch (e) {
+      return Left(ServerFailure(_clean(e)));
+    }
+  }
+
   String _clean(Object e) =>
       e.toString().replaceFirst('Exception: ', '').trim();
 }

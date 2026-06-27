@@ -15,6 +15,16 @@ abstract class UsersRemoteDataSource {
   });
 
   Future<List<ProfileModel>> getVeedoresByRecinto(String recintoId);
+
+  /// Coordinadores de recinto sin recinto asignado (recinto_id IS NULL).
+  Future<List<ProfileModel>> getCoordinadoresSinRecinto();
+
+  /// Asigna un coordinador libre a un recinto sin coordinador.
+  /// Falla si el recinto ya tiene coordinador o si el coordinador ya tiene recinto.
+  Future<void> assignCoordinadorToRecinto({
+    required String coordinadorId,
+    required String recintoId,
+  });
 }
 
 @LazySingleton(as: UsersRemoteDataSource)
@@ -65,5 +75,71 @@ class UsersRemoteDataSourceImpl implements UsersRemoteDataSource {
     return (rows as List)
         .map((e) => ProfileModel.fromMap(e as Map<String, dynamic>))
         .toList();
+  }
+
+  @override
+  Future<List<ProfileModel>> getCoordinadoresSinRecinto() async {
+    final rows = await supabaseClient
+        .from('profiles')
+        .select()
+        .eq('role', UserRole.recinto.dbValue)
+        .isFilter('recinto_id', null)
+        .order('apellidos');
+    return (rows as List)
+        .map((e) => ProfileModel.fromMap(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  @override
+  Future<void> assignCoordinadorToRecinto({
+    required String coordinadorId,
+    required String recintoId,
+  }) async {
+    final recintoRow = await supabaseClient
+        .from('recintos')
+        .select('coordinador_id')
+        .eq('id', recintoId)
+        .single();
+    if (recintoRow['coordinador_id'] != null) {
+      throw Exception('Este recinto ya tiene un coordinador asignado');
+    }
+
+    final coordRow = await supabaseClient
+        .from('profiles')
+        .select('recinto_id, role')
+        .eq('id', coordinadorId)
+        .single();
+    if (coordRow['role'] != UserRole.recinto.dbValue) {
+      throw Exception('El usuario seleccionado no es coordinador de recinto');
+    }
+    if (coordRow['recinto_id'] != null) {
+      throw Exception('Este coordinador ya esta asignado a otro recinto');
+    }
+
+    final assigned = await supabaseClient
+        .from('recintos')
+        .update({'coordinador_id': coordinadorId})
+        .eq('id', recintoId)
+        .isFilter('coordinador_id', null)
+        .select('id')
+        .maybeSingle();
+    if (assigned == null) {
+      throw Exception('Este recinto ya tiene un coordinador asignado');
+    }
+
+    final profileUpdated = await supabaseClient
+        .from('profiles')
+        .update({'recinto_id': recintoId})
+        .eq('id', coordinadorId)
+        .isFilter('recinto_id', null)
+        .select('id')
+        .maybeSingle();
+    if (profileUpdated == null) {
+      await supabaseClient
+          .from('recintos')
+          .update({'coordinador_id': null})
+          .eq('id', recintoId);
+      throw Exception('Este coordinador ya esta asignado a otro recinto');
+    }
   }
 }

@@ -42,22 +42,29 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       ) as String?;
 
       if (email == null || email.isEmpty) {
-        throw Exception('No existe una cuenta con esa cedula');
+        throw Exception(
+          'No existe una cuenta registrada con esa cedula. '
+          'Verifica el numero o contacta a tu coordinador.',
+        );
       }
 
       // 2. Iniciar sesion con email + password.
-      final response = await supabaseClient.auth.signInWithPassword(
-        email: email,
-        password: password,
-      );
-      if (response.user == null) {
-        throw Exception('Credenciales incorrectas');
+      try {
+        final response = await supabaseClient.auth.signInWithPassword(
+          email: email,
+          password: password,
+        );
+        if (response.user == null) {
+          throw Exception('Contrasena incorrecta');
+        }
+        return _fetchProfile(response.user!.id);
+      } on AuthException catch (e) {
+        throw Exception(_mapAuthError(e.message, passwordAttempt: true));
       }
-
-      // 3. Cargar el perfil de dominio.
-      return _fetchProfile(response.user!.id);
     } on AuthException catch (e) {
       throw Exception(_mapAuthError(e.message));
+    } catch (e) {
+      rethrow;
     }
   }
 
@@ -106,10 +113,22 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     return _fetchProfile(user.id);
   }
 
-  String _mapAuthError(String message) {
+  String _mapAuthError(String message, {bool passwordAttempt = false}) {
     final lower = message.toLowerCase();
-    if (lower.contains('invalid login')) {
-      return 'Cedula o contrasena incorrecta';
+    if (passwordAttempt ||
+        lower.contains('invalid login') ||
+        lower.contains('invalid credentials')) {
+      return 'Contrasena incorrecta. Si es tu primer ingreso, '
+          'recuerda que la clave inicial es Ecuador2026.';
+    }
+    if (lower.contains('email not confirmed')) {
+      return 'Debes confirmar tu correo electronico antes de ingresar.';
+    }
+    if (lower.contains('rate limit') || lower.contains('too many requests')) {
+      return 'Demasiados intentos. Espera un momento e intenta de nuevo.';
+    }
+    if (lower.contains('user not found')) {
+      return 'No existe una cuenta registrada con esos datos.';
     }
     return message;
   }

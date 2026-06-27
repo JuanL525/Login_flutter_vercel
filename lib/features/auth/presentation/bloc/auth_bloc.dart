@@ -30,6 +30,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<ResetPasswordRequested>(_onReset);
     on<ChangePasswordRequested>(_onChangePassword);
     on<SignOutRequested>(_onSignOut);
+    on<AuthErrorDismissed>(_onDismissError);
   }
 
   AuthState _resolve(SessionEntity session) {
@@ -94,5 +95,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       (failure) => emit(AuthError(failure.message)),
       (_) => emit(const AuthUnauthenticated()),
     );
+  }
+
+  void _onDismissError(AuthErrorDismissed e, Emitter<AuthState> emit) {
+    emit(const AuthUnauthenticated());
   }
 }

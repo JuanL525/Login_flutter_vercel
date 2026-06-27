@@ -10,6 +10,7 @@ abstract class RecintosRepository {
     required String canton,
     required String parroquia,
     required String nombre,
+    int cantidadMesas = 0,
   });
 
   Future<Either<Failure, RecintoEntity>> updateRecinto({

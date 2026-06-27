@@ -6,6 +6,9 @@ import 'core/constants/app_constants.dart';
 import 'core/db/app_database.dart';
 import 'core/services/connectivity_service.dart';
 import 'features/actas/data/datasources/actas_remote_data_source.dart';
+import 'features/dashboard/domain/repositories/dashboard_repository.dart';
+import 'features/dashboard/domain/usecases/get_votos_consolidados.dart';
+import 'features/dashboard/presentation/bloc/votos_bloc.dart';
 import 'features/sync/data/sync_service.dart';
 import 'injection_container.config.dart';
 
@@ -33,6 +36,15 @@ Future<void> configureDependencies() async {
       remote: getIt<ActasRemoteDataSource>(),
       connectivity: getIt<ConnectivityService>(),
     ),
+  );
+
+  // Casos de uso y BLoC de votos consolidados (registro manual para evitar
+  // re-generar injection_container.config.dart).
+  getIt.registerFactory<GetVotosConsolidados>(
+    () => GetVotosConsolidados(getIt<DashboardRepository>()),
+  );
+  getIt.registerFactory<VotosBloc>(
+    () => VotosBloc(getVotosConsolidados: getIt<GetVotosConsolidados>()),
   );
 
   // Arrancar el servicio de sincronizacion offline.

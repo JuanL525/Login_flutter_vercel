@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/enums.dart';
+import '../../../../core/widgets/user_message_dialog.dart';
 import '../../../../injection_container.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_event.dart';
@@ -8,10 +9,12 @@ import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../../mesas/presentation/pages/mesas_recinto_page.dart';
 import '../../../recintos/presentation/pages/recinto_form_page.dart';
 import '../../../users/domain/entities/profile_entity.dart';
+import '../../../users/domain/repositories/users_repository.dart';
 import '../../../users/presentation/pages/create_user_page.dart';
 import '../../domain/entities/recinto_avance.dart';
 import '../bloc/dashboard_bloc.dart';
 import '../widgets/identity_banner_host.dart';
+import 'informe_votos_page.dart';
 
 class ProvincialHomePage extends StatelessWidget {
   const ProvincialHomePage({super.key});
@@ -62,6 +65,15 @@ class _ProvincialViewState extends State<_ProvincialView> {
       appBar: AppBar(
         title: const Text('Coordinacion Provincial'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.bar_chart_rounded),
+            tooltip: 'Informe de votos',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const InformeVotosPage(),
+              ),
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Recargar',
@@ -150,6 +162,176 @@ class _ProvincialViewState extends State<_ProvincialView> {
   }
 }
 
+/// Muestra un bottom sheet con coordinadores sin recinto para asignarlos.
+Future<void> _showAsignarCoordinadorSheet(
+  BuildContext context, {
+  required String recintoId,
+  required String recintoNombre,
+  required VoidCallback onAssigned,
+}) async {
+  await showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    builder: (_) => _AsignarCoordinadorSheet(
+      recintoId: recintoId,
+      recintoNombre: recintoNombre,
+      onAssigned: onAssigned,
+    ),
+  );
+}
+
+class _AsignarCoordinadorSheet extends StatefulWidget {
+  final String recintoId;
+  final String recintoNombre;
+  final VoidCallback onAssigned;
+  const _AsignarCoordinadorSheet({
+    required this.recintoId,
+    required this.recintoNombre,
+    required this.onAssigned,
+  });
+
+  @override
+  State<_AsignarCoordinadorSheet> createState() =>
+      _AsignarCoordinadorSheetState();
+}
+
+class _AsignarCoordinadorSheetState extends State<_AsignarCoordinadorSheet> {
+  List<ProfileEntity>? _coordinadores;
+  bool _loading = true;
+  bool _assigning = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final result =
+        await getIt<UsersRepository>().getCoordinadoresSinRecinto();
+    if (!mounted) return;
+    result.fold(
+      (f) => setState(() {
+        _error = f.message;
+        _loading = false;
+      }),
+      (list) => setState(() {
+        _coordinadores = list;
+        _loading = false;
+      }),
+    );
+  }
+
+  Future<void> _assign(ProfileEntity coordinador) async {
+    setState(() => _assigning = true);
+    final result = await getIt<UsersRepository>().assignCoordinadorToRecinto(
+      coordinadorId: coordinador.id,
+      recintoId: widget.recintoId,
+    );
+    if (!mounted) return;
+    setState(() => _assigning = false);
+    result.fold(
+      (f) async {
+        await UserMessageDialog.showError(
+          context,
+          title: 'No se pudo asignar',
+          message: f.message,
+        );
+      },
+      (_) async {
+        await UserMessageDialog.showSuccess(
+          context,
+          title: 'Coordinador asignado',
+          message:
+              '${coordinador.nombreCompleto} fue asignado a ${widget.recintoNombre}.',
+          buttonText: 'Listo',
+        );
+        if (mounted) {
+          Navigator.of(context).pop();
+          widget.onAssigned();
+        }
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Asignar coordinador a ${widget.recintoNombre}',
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Solo coordinadores sin recinto (por ejemplo, si su recinto fue eliminado).',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+            const Divider(height: 24),
+            if (_loading || _assigning)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (_error != null)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                child: Text(
+                  _error!,
+                  style: const TextStyle(color: Colors.red),
+                ),
+              )
+            else if (_coordinadores == null || _coordinadores!.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: Center(
+                  child: Text(
+                    'No hay coordinadores sin recinto asignado.\n'
+                    'Crea uno nuevo con "Crear y asignar coordinador".',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                ),
+              )
+            else
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(context).size.height * 0.4,
+                ),
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: _coordinadores!.length,
+                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  itemBuilder: (_, i) {
+                    final c = _coordinadores![i];
+                    return ListTile(
+                      leading: const CircleAvatar(
+                        child: Icon(Icons.person),
+                      ),
+                      title: Text(c.nombreCompleto),
+                      subtitle: Text('C.I.: ${c.cedula}'),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => _assign(c),
+                    );
+                  },
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _RecintoCard extends StatelessWidget {
   final RecintoAvance avance;
   final VoidCallback onChanged;
@@ -158,6 +340,7 @@ class _RecintoCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final recinto = avance.recinto;
+    final sinCoordinador = recinto.coordinadorId == null;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -185,6 +368,15 @@ class _RecintoCard extends StatelessWidget {
                       );
                       if (ok == true && context.mounted) onChanged();
                     } else if (value == 'coordinador') {
+                      if (!sinCoordinador) {
+                        await UserMessageDialog.showError(
+                          context,
+                          title: 'Recinto ocupado',
+                          message:
+                              'Este recinto ya tiene un coordinador asignado.',
+                        );
+                        return;
+                      }
                       final ok = await Navigator.of(context).push<bool>(
                         MaterialPageRoute(
                           builder: (_) => CreateUserPage(
@@ -195,6 +387,22 @@ class _RecintoCard extends StatelessWidget {
                         ),
                       );
                       if (ok == true && context.mounted) onChanged();
+                    } else if (value == 'asignar') {
+                      if (!sinCoordinador) {
+                        await UserMessageDialog.showError(
+                          context,
+                          title: 'Recinto ocupado',
+                          message:
+                              'Este recinto ya tiene un coordinador asignado.',
+                        );
+                        return;
+                      }
+                      await _showAsignarCoordinadorSheet(
+                        context,
+                        recintoId: recinto.id,
+                        recintoNombre: recinto.nombre,
+                        onAssigned: onChanged,
+                      );
                     }
                   },
                   itemBuilder: (_) => [
@@ -202,15 +410,43 @@ class _RecintoCard extends StatelessWidget {
                       value: 'edit',
                       child: Text('Editar recinto'),
                     ),
-                    const PopupMenuItem(
-                      value: 'coordinador',
-                      child: Text('Crear y asignar coordinador'),
-                    ),
+                    if (sinCoordinador) ...[
+                      const PopupMenuItem(
+                        value: 'coordinador',
+                        child: Text('Crear y asignar coordinador'),
+                      ),
+                      const PopupMenuItem(
+                        value: 'asignar',
+                        child: Text('Asignar coordinador existente'),
+                      ),
+                    ],
                   ],
                 ),
               ],
             ),
             Text('${recinto.parroquia}, ${recinto.canton}'),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Icon(
+                  sinCoordinador
+                      ? Icons.person_off_outlined
+                      : Icons.person_outline,
+                  size: 16,
+                  color: sinCoordinador ? Colors.orange : Colors.green,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  sinCoordinador
+                      ? 'Sin coordinador asignado'
+                      : 'Coordinador asignado',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: sinCoordinador ? Colors.orange : Colors.green,
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: 12),
             LinearProgressIndicator(
               value: avance.porcentaje,

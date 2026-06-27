@@ -19,4 +19,13 @@ abstract class UsersRepository {
   Future<Either<Failure, List<ProfileEntity>>> getVeedoresByRecinto(
     String recintoId,
   );
+
+  /// Lista los coordinadores de recinto sin recinto asignado.
+  Future<Either<Failure, List<ProfileEntity>>> getCoordinadoresSinRecinto();
+
+  /// Asigna un coordinador libre a un recinto que aun no tiene coordinador.
+  Future<Either<Failure, void>> assignCoordinadorToRecinto({
+    required String coordinadorId,
+    required String recintoId,
+  });
 }

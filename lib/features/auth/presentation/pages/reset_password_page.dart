@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../core/widgets/user_message_dialog.dart';
 import '../bloc/auth_bloc.dart';
 import '../bloc/auth_event.dart';
 import '../bloc/auth_state.dart';
@@ -37,25 +38,19 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: BlocConsumer<AuthBloc, AuthState>(
-        listener: (context, state) {
-          if (state is AuthError) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: Theme.of(context).colorScheme.error,
-              ),
+        listener: (context, state) async {
+          if (state is ResetPasswordSent) {
+            await UserMessageDialog.showSuccess(
+              context,
+              title: 'Correo enviado',
+              message: 'Revisa tu bandeja de entrada (y spam) para '
+                  'restablecer tu contrasena.',
+              buttonText: 'Volver al login',
             );
-          } else if (state is ResetPasswordSent) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: const Text(
-                  'Se ha enviado un correo de recuperación. Por favor revisa tu bandeja de entrada.',
-                ),
-                backgroundColor: Colors.green,
-                duration: const Duration(seconds: 5),
-              ),
-            );
-            Navigator.of(context).pop();
+            if (context.mounted) {
+              context.read<AuthBloc>().add(const AuthErrorDismissed());
+              Navigator.of(context).pop();
+            }
           }
         },
         builder: (context, state) {

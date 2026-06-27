@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../core/widgets/user_message_dialog.dart';
 import '../bloc/auth_bloc.dart';
 import '../bloc/auth_event.dart';
 import '../bloc/auth_state.dart';
@@ -42,21 +43,19 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
           ? null
           : AppBar(title: const Text('Cambiar contrasena')),
       body: BlocConsumer<AuthBloc, AuthState>(
-        listener: (context, state) {
-          if (state is AuthError) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: Theme.of(context).colorScheme.error,
-              ),
+        listener: (context, state) async {
+          if (state is AuthAuthenticated && !widget.mandatory) {
+            await UserMessageDialog.showSuccess(
+              context,
+              title: 'Contrasena actualizada',
+              message: 'Tu nueva contrasena quedo guardada correctamente.',
             );
-          } else if (state is AuthAuthenticated && !widget.mandatory) {
-            Navigator.of(context).pop();
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Contrasena actualizada'),
-                backgroundColor: Colors.green,
-              ),
+            if (context.mounted) Navigator.of(context).pop();
+          } else if (state is AuthAuthenticated && widget.mandatory) {
+            await UserMessageDialog.showSuccess(
+              context,
+              title: 'Contrasena actualizada',
+              message: 'Ya puedes usar la aplicacion con tu nueva contrasena.',
             );
           }
         },

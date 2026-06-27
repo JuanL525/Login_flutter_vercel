@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/enums.dart';
 import '../../../../core/validators/cedula_validator.dart';
+import '../../../../core/widgets/user_message_dialog.dart';
 import '../../../../injection_container.dart';
 import '../../../auth/presentation/widgets/custom_text_field.dart';
 import '../../../auth/presentation/widgets/loading_overlay.dart';
@@ -83,23 +84,24 @@ class _CreateUserViewState extends State<_CreateUserView> {
     return Scaffold(
       appBar: AppBar(title: Text(widget.title)),
       body: BlocConsumer<UsersBloc, UsersState>(
-        listener: (context, state) {
+        listener: (context, state) async {
           if (state is UsersError) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: Theme.of(context).colorScheme.error,
-              ),
+            await UserMessageDialog.showError(
+              context,
+              title: 'No se pudo crear la cuenta',
+              message: state.message,
             );
           } else if (state is UserCreatedSuccess) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Cuenta creada. Contrasena inicial: Ecuador2026'),
-                backgroundColor: Colors.green,
-                duration: Duration(seconds: 4),
-              ),
+            await UserMessageDialog.showSuccess(
+              context,
+              title: 'Cuenta creada',
+              message: 'Se envio un correo de verificacion a la direccion '
+                  'registrada. El usuario debe verificar su cuenta antes de '
+                  'ingresar por primera vez.\n\n'
+                  'Contrasena inicial: Ecuador2026',
+              buttonText: 'Entendido',
             );
-            Navigator.of(context).pop(true);
+            if (context.mounted) Navigator.of(context).pop(true);
           }
         },
         builder: (context, state) {
@@ -168,17 +170,40 @@ class _CreateUserViewState extends State<_CreateUserView> {
                       Card(
                         child: Padding(
                           padding: const EdgeInsets.all(16),
-                          child: Row(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Icon(Icons.vpn_key_outlined),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  'La contrasena inicial sera Ecuador2026 y el '
-                                  'usuario debera cambiarla al primer ingreso.',
-                                  style:
-                                      Theme.of(context).textTheme.bodyMedium,
-                                ),
+                              Row(
+                                children: [
+                                  const Icon(Icons.mark_email_unread_outlined),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Text(
+                                      'Se enviara un correo de verificacion. '
+                                      'El usuario debe confirmar su cuenta '
+                                      'antes de poder ingresar.',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyMedium,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                              Row(
+                                children: [
+                                  const Icon(Icons.vpn_key_outlined),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Text(
+                                      'Contrasena inicial: Ecuador2026. '
+                                      'Debera cambiarla en el primer ingreso.',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyMedium,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),

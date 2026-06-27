@@ -33,6 +33,7 @@ class RecintosRepositoryImpl implements RecintosRepository {
     required String canton,
     required String parroquia,
     required String nombre,
+    int cantidadMesas = 0,
   }) async {
     if (!await networkInfo.isConnected) {
       return const Left(NetworkFailure('Sin conexion a internet'));
@@ -46,6 +47,7 @@ class RecintosRepositoryImpl implements RecintosRepository {
           parroquia: parroquia,
           nombre: nombre,
         ),
+        cantidadMesas: cantidadMesas,
       );
       return Right(created);
     } catch (e) {

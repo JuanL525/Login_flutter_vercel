@@ -19,6 +19,7 @@ class SaveRecinto implements UseCase<RecintoEntity, SaveRecintoParams> {
         canton: params.canton,
         parroquia: params.parroquia,
         nombre: params.nombre,
+        cantidadMesas: params.cantidadMesas,
       );
     }
     return repository.updateRecinto(
@@ -37,6 +38,7 @@ class SaveRecintoParams {
   final String canton;
   final String parroquia;
   final String nombre;
+  final int cantidadMesas;
 
   SaveRecintoParams({
     this.id,
@@ -44,5 +46,6 @@ class SaveRecintoParams {
     required this.canton,
     required this.parroquia,
     required this.nombre,
+    this.cantidadMesas = 0,
   });
 }

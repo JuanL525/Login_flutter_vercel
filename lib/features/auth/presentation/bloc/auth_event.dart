@@ -35,3 +35,8 @@ class ChangePasswordRequested extends AuthEvent {
 class SignOutRequested extends AuthEvent {
   const SignOutRequested();
 }
+
+/// Limpia el estado de error tras mostrarlo al usuario.
+class AuthErrorDismissed extends AuthEvent {
+  const AuthErrorDismissed();
+}

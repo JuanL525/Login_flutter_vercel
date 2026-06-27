@@ -4,7 +4,7 @@ import '../models/recinto_model.dart';
 
 abstract class RecintosRemoteDataSource {
   Future<List<RecintoModel>> getRecintos();
-  Future<RecintoModel> createRecinto(RecintoModel recinto);
+  Future<RecintoModel> createRecinto(RecintoModel recinto, {int cantidadMesas = 0});
   Future<RecintoModel> updateRecinto(RecintoModel recinto);
 }
 
@@ -25,13 +25,27 @@ class RecintosRemoteDataSourceImpl implements RecintosRemoteDataSource {
   }
 
   @override
-  Future<RecintoModel> createRecinto(RecintoModel recinto) async {
+  Future<RecintoModel> createRecinto(
+    RecintoModel recinto, {
+    int cantidadMesas = 0,
+  }) async {
     final row = await supabaseClient
         .from('recintos')
         .insert(recinto.toInsert())
         .select()
         .single();
-    return RecintoModel.fromMap(row);
+    final created = RecintoModel.fromMap(row);
+
+    // Insertar las mesas (JRV) numeradas del 1 al cantidadMesas.
+    if (cantidadMesas > 0) {
+      final mesas = List.generate(
+        cantidadMesas,
+        (i) => {'recinto_id': created.id, 'numero_jrv': i + 1},
+      );
+      await supabaseClient.from('mesas').insert(mesas);
+    }
+
+    return created;
   }
 
   @override
