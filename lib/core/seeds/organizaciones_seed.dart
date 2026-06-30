@@ -21,23 +21,23 @@ class OrganizacionPolitica {
 const List<OrganizacionPolitica> kOrganizacionesAlcaldia = [
   OrganizacionPolitica(
     id: 'alc_1',
-    nombre: 'Movimiento Union Ciudadana',
+    nombre: 'Movimiento Unión Ciudadana',
     lista: 'Lista 1',
     candidato: 'Andrea Vaca',
     dignidad: Dignidad.alcalde,
   ),
   OrganizacionPolitica(
     id: 'alc_2',
-    nombre: 'Frente Progreso Quiteno',
+    nombre: 'Frente Progreso Quiteño',
     lista: 'Lista 7',
-    candidato: 'Marco Riofrio',
+    candidato: 'Marco Riofrío',
     dignidad: Dignidad.alcalde,
   ),
   OrganizacionPolitica(
     id: 'alc_3',
     nombre: 'Alianza Capital',
     lista: 'Lista 12',
-    candidato: 'Sofia Naranjo',
+    candidato: 'Sofía Naranjo',
     dignidad: Dignidad.alcalde,
   ),
   OrganizacionPolitica(
@@ -49,9 +49,9 @@ const List<OrganizacionPolitica> kOrganizacionesAlcaldia = [
   ),
   OrganizacionPolitica(
     id: 'alc_5',
-    nombre: 'Partido Renovacion',
+    nombre: 'Partido Renovación',
     lista: 'Lista 35',
-    candidato: 'Veronica Cisneros',
+    candidato: 'Verónica Cisneros',
     dignidad: Dignidad.alcalde,
   ),
 ];
@@ -62,14 +62,14 @@ const List<OrganizacionPolitica> kOrganizacionesPrefectura = [
     id: 'pre_1',
     nombre: 'Pichincha Unida',
     lista: 'Lista 2',
-    candidato: 'Ramiro Paez',
+    candidato: 'Ramiro Páez',
     dignidad: Dignidad.prefecto,
   ),
   OrganizacionPolitica(
     id: 'pre_2',
     nombre: 'Movimiento Provincia Activa',
     lista: 'Lista 8',
-    candidato: 'Lucia Mena',
+    candidato: 'Lucía Mena',
     dignidad: Dignidad.prefecto,
   ),
   OrganizacionPolitica(

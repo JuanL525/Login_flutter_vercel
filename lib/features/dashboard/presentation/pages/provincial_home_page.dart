@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/enums.dart';
+import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/screen_entrance.dart';
+import '../../../../core/widgets/soft_card.dart';
+import '../../../../core/widgets/status_chip.dart';
 import '../../../../core/widgets/user_message_dialog.dart';
 import '../../../../injection_container.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
@@ -63,7 +67,7 @@ class _ProvincialViewState extends State<_ProvincialView> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Coordinacion Provincial'),
+        title: const Text('Coordinación Provincial'),
         actions: [
           IconButton(
             icon: const Icon(Icons.bar_chart_rounded),
@@ -75,12 +79,12 @@ class _ProvincialViewState extends State<_ProvincialView> {
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(Icons.refresh_rounded),
             tooltip: 'Recargar',
             onPressed: _refreshAll,
           ),
           IconButton(
-            icon: const Icon(Icons.logout),
+            icon: const Icon(Icons.logout_rounded),
             onPressed: () =>
                 context.read<AuthBloc>().add(const SignOutRequested()),
           ),
@@ -95,7 +99,7 @@ class _ProvincialViewState extends State<_ProvincialView> {
             _refreshAll();
           }
         },
-        icon: const Icon(Icons.add_location_alt),
+        icon: const Icon(Icons.add_location_alt_outlined),
         label: const Text('Nuevo recinto'),
       ),
       body: Column(
@@ -112,10 +116,10 @@ class _ProvincialViewState extends State<_ProvincialView> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(
-                          Icons.error_outline,
+                        Icon(
+                          Icons.error_outline_rounded,
                           size: 48,
-                          color: Colors.red,
+                          color: Theme.of(context).colorScheme.error,
                         ),
                         const SizedBox(height: 12),
                         Padding(
@@ -125,7 +129,7 @@ class _ProvincialViewState extends State<_ProvincialView> {
                             textAlign: TextAlign.center,
                           ),
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 16),
                         ElevatedButton(
                           onPressed: _refreshAll,
                           child: const Text('Reintentar'),
@@ -136,20 +140,24 @@ class _ProvincialViewState extends State<_ProvincialView> {
                 }
                 final loaded = state as DashboardLoaded;
                 if (loaded.avances.isEmpty) {
-                  return const Center(
-                    child: Text('No hay recintos registrados'),
+                  return Center(
+                    child: Text(
+                      'No hay recintos registrados',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
                   );
                 }
                 return RefreshIndicator(
                   onRefresh: () async => _refreshAll(),
                   child: ListView.separated(
                     physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
                     itemCount: loaded.avances.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 12),
                     itemBuilder: (context, i) => _RecintoCard(
                       avance: loaded.avances[i],
                       onChanged: _refreshAll,
+                      index: i,
                     ),
                   ),
                 );
@@ -162,7 +170,6 @@ class _ProvincialViewState extends State<_ProvincialView> {
   }
 }
 
-/// Muestra un bottom sheet con coordinadores sin recinto para asignarlos.
 Future<void> _showAsignarCoordinadorSheet(
   BuildContext context, {
   required String recintoId,
@@ -259,27 +266,29 @@ class _AsignarCoordinadorSheetState extends State<_AsignarCoordinadorSheet> {
   Widget build(BuildContext context) {
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Asignar coordinador a ${widget.recintoNombre}',
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
+              'Asignar coordinador',
+              style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 4),
-            const Text(
-              'Solo coordinadores sin recinto (por ejemplo, si su recinto fue eliminado).',
-              style: TextStyle(fontSize: 12, color: Colors.grey),
+            Text(
+              widget.recintoNombre,
+              style: Theme.of(context).textTheme.bodyMedium,
             ),
-            const Divider(height: 24),
+            const SizedBox(height: 4),
+            Text(
+              'Solo coordinadores sin recinto asignado.',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 12),
+            ),
+            const SizedBox(height: 16),
             if (_loading || _assigning)
               const Padding(
-                padding: EdgeInsets.symmetric(vertical: 24),
+                padding: EdgeInsets.symmetric(vertical: 32),
                 child: Center(child: CircularProgressIndicator()),
               )
             else if (_error != null)
@@ -287,40 +296,61 @@ class _AsignarCoordinadorSheetState extends State<_AsignarCoordinadorSheet> {
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 child: Text(
                   _error!,
-                  style: const TextStyle(color: Colors.red),
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
                 ),
               )
             else if (_coordinadores == null || _coordinadores!.isEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 24),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 24),
                 child: Center(
                   child: Text(
-                    'No hay coordinadores sin recinto asignado.\n'
-                    'Crea uno nuevo con "Crear y asignar coordinador".',
+                    'No hay coordinadores sin recinto.\n'
+                    'Crea uno con "Crear y asignar coordinador".',
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.grey),
+                    style: Theme.of(context).textTheme.bodyMedium,
                   ),
                 ),
               )
             else
               ConstrainedBox(
                 constraints: BoxConstraints(
-                  maxHeight: MediaQuery.of(context).size.height * 0.4,
+                  maxHeight: MediaQuery.of(context).size.height * 0.45,
                 ),
                 child: ListView.separated(
                   shrinkWrap: true,
                   itemCount: _coordinadores!.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  separatorBuilder: (_, __) => const SizedBox(height: 8),
                   itemBuilder: (_, i) {
                     final c = _coordinadores![i];
-                    return ListTile(
-                      leading: const CircleAvatar(
-                        child: Icon(Icons.person),
-                      ),
-                      title: Text(c.nombreCompleto),
-                      subtitle: Text('C.I.: ${c.cedula}'),
-                      trailing: const Icon(Icons.chevron_right),
+                    return SoftCard(
                       onTap: () => _assign(c),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      radius: 16,
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.1),
+                            child: const Icon(Icons.person_outline, color: AppTheme.primaryColor),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  c.nombreCompleto,
+                                  style: const TextStyle(fontWeight: FontWeight.w600),
+                                ),
+                                Text(
+                                  'C.I.: ${c.cedula}',
+                                  style: Theme.of(context).textTheme.bodyMedium,
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Icon(Icons.chevron_right_rounded),
+                        ],
+                      ),
                     );
                   },
                 ),
@@ -335,151 +365,183 @@ class _AsignarCoordinadorSheetState extends State<_AsignarCoordinadorSheet> {
 class _RecintoCard extends StatelessWidget {
   final RecintoAvance avance;
   final VoidCallback onChanged;
-  const _RecintoCard({required this.avance, required this.onChanged});
+  final int index;
+
+  const _RecintoCard({
+    required this.avance,
+    required this.onChanged,
+    required this.index,
+  });
 
   @override
   Widget build(BuildContext context) {
     final recinto = avance.recinto;
     final sinCoordinador = recinto.coordinadorId == null;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    recinto.nombre,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+    return SoftCard(
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  recinto.nombre,
+                  style: Theme.of(context).textTheme.titleMedium,
                 ),
-                PopupMenuButton<String>(
-                  onSelected: (value) async {
-                    if (value == 'edit') {
-                      final ok = await Navigator.of(context).push<bool>(
-                        MaterialPageRoute(
-                          builder: (_) => RecintoFormPage(recinto: recinto),
-                        ),
-                      );
-                      if (ok == true && context.mounted) onChanged();
-                    } else if (value == 'coordinador') {
-                      if (!sinCoordinador) {
-                        await UserMessageDialog.showError(
-                          context,
-                          title: 'Recinto ocupado',
-                          message:
-                              'Este recinto ya tiene un coordinador asignado.',
-                        );
-                        return;
-                      }
-                      final ok = await Navigator.of(context).push<bool>(
-                        MaterialPageRoute(
-                          builder: (_) => CreateUserPage(
-                            role: UserRole.recinto,
-                            title: 'Crear coordinador',
-                            recintoId: recinto.id,
-                          ),
-                        ),
-                      );
-                      if (ok == true && context.mounted) onChanged();
-                    } else if (value == 'asignar') {
-                      if (!sinCoordinador) {
-                        await UserMessageDialog.showError(
-                          context,
-                          title: 'Recinto ocupado',
-                          message:
-                              'Este recinto ya tiene un coordinador asignado.',
-                        );
-                        return;
-                      }
-                      await _showAsignarCoordinadorSheet(
+              ),
+              PopupMenuButton<String>(
+                icon: const Icon(Icons.more_horiz_rounded),
+                onSelected: (value) async {
+                  if (value == 'edit') {
+                    final ok = await Navigator.of(context).push<bool>(
+                      MaterialPageRoute(
+                        builder: (_) => RecintoFormPage(recinto: recinto),
+                      ),
+                    );
+                    if (ok == true && context.mounted) onChanged();
+                  } else if (value == 'coordinador') {
+                    if (!sinCoordinador) {
+                      await UserMessageDialog.showError(
                         context,
-                        recintoId: recinto.id,
-                        recintoNombre: recinto.nombre,
-                        onAssigned: onChanged,
+                        title: 'Recinto ocupado',
+                        message:
+                            'Este recinto ya tiene un coordinador asignado.',
                       );
+                      return;
                     }
-                  },
-                  itemBuilder: (_) => [
+                    final ok = await Navigator.of(context).push<bool>(
+                      MaterialPageRoute(
+                        builder: (_) => CreateUserPage(
+                          role: UserRole.recinto,
+                          title: 'Crear coordinador',
+                          recintoId: recinto.id,
+                        ),
+                      ),
+                    );
+                    if (ok == true && context.mounted) onChanged();
+                  } else if (value == 'asignar') {
+                    if (!sinCoordinador) {
+                      await UserMessageDialog.showError(
+                        context,
+                        title: 'Recinto ocupado',
+                        message:
+                            'Este recinto ya tiene un coordinador asignado.',
+                      );
+                      return;
+                    }
+                    await _showAsignarCoordinadorSheet(
+                      context,
+                      recintoId: recinto.id,
+                      recintoNombre: recinto.nombre,
+                      onAssigned: onChanged,
+                    );
+                  }
+                },
+                itemBuilder: (_) => [
+                  const PopupMenuItem(
+                    value: 'edit',
+                    child: Text('Editar recinto'),
+                  ),
+                  if (sinCoordinador) ...[
                     const PopupMenuItem(
-                      value: 'edit',
-                      child: Text('Editar recinto'),
+                      value: 'coordinador',
+                      child: Text('Crear y asignar coordinador'),
                     ),
-                    if (sinCoordinador) ...[
-                      const PopupMenuItem(
-                        value: 'coordinador',
-                        child: Text('Crear y asignar coordinador'),
-                      ),
-                      const PopupMenuItem(
-                        value: 'asignar',
-                        child: Text('Asignar coordinador existente'),
-                      ),
-                    ],
+                    const PopupMenuItem(
+                      value: 'asignar',
+                      child: Text('Asignar coordinador existente'),
+                    ),
                   ],
-                ),
-              ],
-            ),
-            Text('${recinto.parroquia}, ${recinto.canton}'),
-            const SizedBox(height: 6),
+                ],
+              ),
+            ],
+          ),
+          Text(
+            '${recinto.parroquia}, ${recinto.canton}',
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 10),
+          StatusChip(
+            label: sinCoordinador
+                ? 'Sin coordinador'
+                : 'Coordinador asignado',
+            type: sinCoordinador ? AppStatusType.warning : AppStatusType.success,
+            icon: sinCoordinador
+                ? Icons.person_off_outlined
+                : Icons.person_outline,
+          ),
+          if (!sinCoordinador &&
+              (avance.coordinadorNombre?.isNotEmpty ?? false)) ...[
+            const SizedBox(height: 8),
             Row(
               children: [
                 Icon(
-                  sinCoordinador
-                      ? Icons.person_off_outlined
-                      : Icons.person_outline,
+                  Icons.badge_outlined,
                   size: 16,
-                  color: sinCoordinador ? Colors.orange : Colors.green,
+                  color: AppTheme.textSecondaryColor,
                 ),
                 const SizedBox(width: 6),
-                Text(
-                  sinCoordinador
-                      ? 'Sin coordinador asignado'
-                      : 'Coordinador asignado',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: sinCoordinador ? Colors.orange : Colors.green,
+                Expanded(
+                  child: Text(
+                    avance.coordinadorNombre!,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                      color: AppTheme.textPrimaryColor,
+                    ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-            LinearProgressIndicator(
+            if (avance.coordinadorCedula != null) ...[
+              const SizedBox(height: 2),
+              Padding(
+                padding: const EdgeInsets.only(left: 22),
+                child: Text(
+                  'C.I.: ${avance.coordinadorCedula}',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontSize: 12,
+                      ),
+                ),
+              ),
+            ],
+          ],
+          const SizedBox(height: 14),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: LinearProgressIndicator(
               value: avance.porcentaje,
               minHeight: 8,
-              borderRadius: BorderRadius.circular(4),
             ),
-            const SizedBox(height: 8),
-            Text(
-              'Actas: ${avance.actasRegistradas}/${avance.actasEsperadas} '
-              '(${(avance.porcentaje * 100).toStringAsFixed(0)}%) - '
-              '${avance.totalMesas} mesas',
-            ),
-            const SizedBox(height: 8),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton.icon(
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => MesasRecintoPage(
-                        recintoId: recinto.id,
-                        canManage: false,
-                      ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Actas: ${avance.actasRegistradas}/${avance.actasEsperadas} '
+            '(${(avance.porcentaje * 100).toStringAsFixed(0)}%) · '
+            '${avance.totalMesas} mesas',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 13),
+          ),
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => MesasRecintoPage(
+                      recintoId: recinto.id,
+                      canManage: false,
                     ),
-                  );
-                },
-                icon: const Icon(Icons.visibility_outlined),
-                label: const Text('Ver mesas y actas'),
-              ),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.visibility_outlined),
+              label: const Text('Ver mesas y actas'),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
-    );
+    ).staggered(index);
   }
 }

@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/enums.dart';
 import '../../../../core/seeds/organizaciones_seed.dart';
+import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/section_label.dart';
+import '../../../../core/widgets/soft_card.dart';
 import '../../../../injection_container.dart';
 import '../../domain/entities/votos_consolidados.dart';
 import '../bloc/votos_bloc.dart';
@@ -127,16 +130,11 @@ class _DignidadTab extends StatelessWidget {
         children: [
           _AvanceCard(consolidado: consolidado),
           const SizedBox(height: 16),
-          Text(
-            'Resultados globales',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-          ),
-          const SizedBox(height: 8),
+          const SectionLabel('Resultados globales'),
+          const SizedBox(height: 4),
           if (consolidado.actasContadas == 0)
             const _EmptyCard(
-              mensaje: 'Aun no hay actas registradas para esta dignidad.',
+              mensaje: 'Aún no hay actas registradas para esta dignidad.',
             )
           else ...[
             ...sorted.asMap().entries.map((entry) {
@@ -157,15 +155,10 @@ class _DignidadTab extends StatelessWidget {
             ),
           ],
           const SizedBox(height: 20),
-          Text(
-            'Desglose por recinto',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-          ),
-          const SizedBox(height: 8),
+          const SectionLabel('Desglose por recinto'),
+          const SizedBox(height: 4),
           if (consolidado.porRecinto.isEmpty)
-            const _EmptyCard(mensaje: 'Sin datos por recinto todavia.')
+            const _EmptyCard(mensaje: 'Sin datos por recinto todavía.')
           else
             ...consolidado.porRecinto.map(
               (r) => _RecintoExpansion(
@@ -191,72 +184,64 @@ class _AvanceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     final pct = consolidado.porcentajeAvance;
 
-    return Card(
-      color: cs.primaryContainer,
-      elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+    return SoftCard(
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryColor.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.bar_chart_rounded, color: AppTheme.primaryColor),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Cobertura: ${consolidado.actasContadas}/'
+                  '${consolidado.actasEsperadas} actas',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(fontSize: 15),
+                ),
+              ),
+              Text(
+                '${(pct * 100).toStringAsFixed(0)}%',
+                style: const TextStyle(
+                  color: AppTheme.accentColor,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 20,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: LinearProgressIndicator(
+              value: pct,
+              minHeight: 10,
+            ),
+          ),
+          if (consolidado.totalSufragantes > 0) ...[
+            const SizedBox(height: 10),
             Row(
               children: [
-                Icon(Icons.bar_chart_rounded, color: cs.primary),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Cobertura: ${consolidado.actasContadas}/'
-                    '${consolidado.actasEsperadas} actas',
-                    style: TextStyle(
-                      color: cs.onPrimaryContainer,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 15,
-                    ),
-                  ),
-                ),
+                Icon(Icons.how_to_vote_outlined,
+                    size: 14, color: AppTheme.textSecondaryColor),
+                const SizedBox(width: 6),
                 Text(
-                  '${(pct * 100).toStringAsFixed(0)}%',
-                  style: TextStyle(
-                    color: cs.primary,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
-                  ),
+                  'Sufragantes contabilizados: ${consolidado.totalSufragantes}',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 13),
                 ),
               ],
             ),
-            const SizedBox(height: 10),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(6),
-              child: LinearProgressIndicator(
-                value: pct,
-                minHeight: 10,
-                backgroundColor: cs.onPrimaryContainer.withValues(alpha: 0.15),
-              ),
-            ),
-            if (consolidado.totalSufragantes > 0) ...[
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Icon(Icons.how_to_vote_outlined,
-                      size: 14, color: cs.onPrimaryContainer),
-                  const SizedBox(width: 4),
-                  Text(
-                    'Sufragantes contabilizados: '
-                    '${consolidado.totalSufragantes}',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: cs.onPrimaryContainer.withValues(alpha: 0.8),
-                    ),
-                  ),
-                ],
-              ),
-            ],
           ],
-        ),
+        ],
       ),
     );
   }
@@ -297,11 +282,10 @@ class _CandidatoCard extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final pctStr = '${(porcentaje * 100).toStringAsFixed(1)}%';
 
-    return Card(
+    return SoftCard(
       margin: const EdgeInsets.only(bottom: 10),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 12, 16, 12),
-        child: Row(
+      padding: const EdgeInsets.fromLTRB(16, 14, 18, 14),
+      child: Row(
           children: [
             Container(
               width: 36,
@@ -374,7 +358,6 @@ class _CandidatoCard extends StatelessWidget {
             ),
           ],
         ),
-      ),
     );
   }
 }
@@ -493,8 +476,9 @@ class _RecintoExpansion extends StatelessWidget {
         desglose.blancos +
         desglose.nulos;
 
-    return Card(
+    return SoftCard(
       margin: const EdgeInsets.only(bottom: 8),
+      padding: EdgeInsets.zero,
       child: ExpansionTile(
         leading: Icon(Icons.school_outlined, color: cs.primary),
         title: Text(
@@ -582,18 +566,13 @@ class _EmptyCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Center(
-          child: Text(
-            mensaje,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color:
-                  Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
-            ),
-          ),
+    return SoftCard(
+      padding: const EdgeInsets.all(24),
+      child: Center(
+        child: Text(
+          mensaje,
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.bodyMedium,
         ),
       ),
     );
@@ -613,7 +592,7 @@ class _ErrorBody extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline, size: 48, color: Colors.red),
+            const Icon(Icons.error_outline_rounded, size: 48, color: AppTheme.errorColor),
             const SizedBox(height: 12),
             Text(message, textAlign: TextAlign.center),
             const SizedBox(height: 16),

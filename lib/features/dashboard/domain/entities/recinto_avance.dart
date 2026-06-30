@@ -7,11 +7,15 @@ class RecintoAvance extends Equatable {
 
   /// Total de actas esperadas = totalMesas * 2 (alcalde + prefecto).
   final int actasRegistradas;
+  final String? coordinadorNombre;
+  final String? coordinadorCedula;
 
   const RecintoAvance({
     required this.recinto,
     required this.totalMesas,
     required this.actasRegistradas,
+    this.coordinadorNombre,
+    this.coordinadorCedula,
   });
 
   int get actasEsperadas => totalMesas * 2;
@@ -19,5 +23,6 @@ class RecintoAvance extends Equatable {
       actasEsperadas == 0 ? 0 : actasRegistradas / actasEsperadas;
 
   @override
-  List<Object?> get props => [recinto, totalMesas, actasRegistradas];
+  List<Object?> get props =>
+      [recinto, totalMesas, actasRegistradas, coordinadorNombre, coordinadorCedula];
 }

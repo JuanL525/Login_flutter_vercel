@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:uuid/uuid.dart';
 import '../../../../core/constants/enums.dart';
@@ -8,6 +7,13 @@ import '../../../../core/seeds/organizaciones_seed.dart';
 import '../../../../core/services/blur_detector.dart';
 import '../../../../core/services/gps_service.dart';
 import '../../../../core/services/photo_capture_service.dart';
+import '../../../../core/theme/app_decorations.dart';
+import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/ios_settings_group.dart';
+import '../../../../core/widgets/primary_button.dart';
+import '../../../../core/widgets/scale_on_tap.dart';
+import '../../../../core/widgets/section_label.dart';
+import '../../../../core/widgets/soft_card.dart';
 import '../../../../injection_container.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
@@ -93,20 +99,18 @@ class _ActaFormPageState extends State<ActaFormPage> {
     setState(() => _capturing = true);
     final messenger = ScaffoldMessenger.of(context);
     try {
-      // 1. Foto con validacion de nitidez.
       final photoService = getIt<PhotoCaptureService>();
       final photo = await photoService.capture();
       if (photo == null) {
         setState(() => _capturing = false);
         return;
       }
-      // 2. GPS (obligatorio).
       final gpsService = getIt<GpsService>();
       final pos = await gpsService.getCurrentPosition();
 
       setState(() {
         _fotoLocalPath = photo.localPath;
-        _fotoPath = null; // foto nueva: se subira al sincronizar
+        _fotoPath = null;
         _sharpness = photo.sharpnessVariance;
         _lat = pos.latitude;
         _lng = pos.longitude;
@@ -115,10 +119,10 @@ class _ActaFormPageState extends State<ActaFormPage> {
       messenger.showSnackBar(
         SnackBar(
           content: Text(
-            'Foto nitida (${photo.sharpnessVariance.toStringAsFixed(0)}) '
+            'Foto nítida (${photo.sharpnessVariance.toStringAsFixed(0)}) '
             'y GPS capturados',
           ),
-          backgroundColor: Colors.green,
+          backgroundColor: AppTheme.successColor,
         ),
       );
     } on BlurryPhotoException catch (e) {
@@ -126,7 +130,7 @@ class _ActaFormPageState extends State<ActaFormPage> {
       messenger.showSnackBar(
         SnackBar(
           content: Text(e.toString()),
-          backgroundColor: Colors.orange,
+          backgroundColor: AppTheme.accentColor,
         ),
       );
     } on LocationPermissionException catch (e) {
@@ -187,7 +191,6 @@ class _ActaFormPageState extends State<ActaFormPage> {
       synced: false,
     );
 
-    // Validacion de negocio antes de enviar (feedback inmediato).
     final error = SaveActa.validateVotos(acta);
     if (error != null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -199,7 +202,6 @@ class _ActaFormPageState extends State<ActaFormPage> {
       return;
     }
 
-    // Revalidar nitidez al guardar (por si la foto se corrompio o es antigua).
     if (_fotoLocalPath != null && File(_fotoLocalPath!).existsSync()) {
       final bytes = await File(_fotoLocalPath!).readAsBytes();
       final blur = getIt<BlurDetector>().analyze(bytes);
@@ -208,10 +210,10 @@ class _ActaFormPageState extends State<ActaFormPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'La foto no cumple el minimo de nitidez. '
+              'La foto no cumple el mínimo de nitidez. '
               'Vuelva a tomarla antes de guardar.',
             ),
-            backgroundColor: Colors.orange,
+            backgroundColor: AppTheme.accentColor,
           ),
         );
         return;
@@ -239,7 +241,7 @@ class _ActaFormPageState extends State<ActaFormPage> {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text('Acta guardada'),
-                backgroundColor: Colors.green,
+                backgroundColor: AppTheme.successColor,
               ),
             );
           } else if (state is ActasError) {
@@ -260,60 +262,122 @@ class _ActaFormPageState extends State<ActaFormPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Text(
-                    'Votos por organizacion politica',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  ..._orgs.map(_buildOrgField),
-                  const Divider(height: 32),
-                  _buildNumberField('Votos en blanco', _blancosCtrl),
-                  const SizedBox(height: 12),
-                  _buildNumberField('Votos nulos', _nulosCtrl),
-                  const SizedBox(height: 12),
-                  _buildNumberField('Total de sufragantes', _totalCtrl),
-                  const SizedBox(height: 16),
-                  Card(
-                    color: exceso
-                        ? Theme.of(context)
-                            .colorScheme
-                            .error
-                            .withValues(alpha: 0.1)
-                        : null,
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Row(
-                        children: [
-                          Icon(
-                            exceso ? Icons.warning_amber : Icons.calculate,
-                            color: exceso
-                                ? Theme.of(context).colorScheme.error
-                                : Theme.of(context).colorScheme.primary,
+                  IosSettingsGroup(
+                    label: 'Organizaciones políticas',
+                    children: [
+                      for (var i = 0; i < _orgs.length; i++)
+                        IosSettingsRow(
+                          title: '${_orgs[i].lista} - ${_orgs[i].nombre}',
+                          subtitle: _orgs[i].candidato,
+                          showDivider: i < _orgs.length - 1,
+                          trailing: IosNumberField(
+                            controller: _votosCtrls[_orgs[i].id]!,
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child:                           Text(
-                              exceso
-                                  ? 'La suma ($suma) debe ser igual al total ($total)'
-                                  : total > 0
-                                      ? 'Suma contabilizada: $suma / $total ✓'
-                                      : 'Suma contabilizada: $suma',
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  IosSettingsGroup(
+                    label: 'Otros votos',
+                    children: [
+                      IosSettingsRow(
+                        title: 'Votos en blanco',
+                        trailing: IosNumberField(controller: _blancosCtrl),
+                      ),
+                      IosSettingsRow(
+                        title: 'Votos nulos',
+                        trailing: IosNumberField(controller: _nulosCtrl),
+                      ),
+                      IosSettingsRow(
+                        title: 'Total de sufragantes',
+                        showDivider: false,
+                        trailing: IosNumberField(controller: _totalCtrl),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  SoftCard(
+                    color: exceso
+                        ? AppTheme.errorColor.withValues(alpha: 0.06)
+                        : null,
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        Icon(
+                          exceso ? Icons.warning_amber_rounded : Icons.calculate_outlined,
+                          color: exceso
+                              ? AppTheme.errorColor
+                              : AppTheme.primaryColor,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            exceso
+                                ? 'La suma ($suma) debe ser igual al total ($total)'
+                                : total > 0
+                                    ? 'Suma contabilizada: $suma / $total'
+                                    : 'Suma contabilizada: $suma',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: exceso
+                                  ? AppTheme.errorColor
+                                  : AppTheme.textPrimaryColor,
                             ),
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
-                  const Divider(height: 32),
-                  _buildPhotoSection(),
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    height: 56,
-                    child: ElevatedButton.icon(
-                      onPressed: _capturing ? null : _save,
-                      icon: const Icon(Icons.save),
-                      label: const Text('Guardar acta'),
+                  const SizedBox(height: 20),
+                  const SectionLabel('Foto del acta + GPS'),
+                  SoftCard(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _buildPhotoPreview(),
+                        if (_sharpness != null) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            'Nitidez: ${_sharpness!.toStringAsFixed(0)} '
+                            '(min ${BlurDetector.minLaplacianVariance.toStringAsFixed(0)})',
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                        ],
+                        if (_lat != null && _lng != null) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            'GPS: ${_lat!.toStringAsFixed(5)}, ${_lng!.toStringAsFixed(5)}',
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                        ],
+                        const SizedBox(height: 12),
+                        ScaleOnTap(
+                          onTap: _capturing ? null : _capturarFotoYGps,
+                          child: OutlinedButton.icon(
+                            onPressed: _capturing ? null : _capturarFotoYGps,
+                            icon: _capturing
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                : const Icon(Icons.camera_alt_outlined),
+                            label: Text(
+                              (_fotoLocalPath != null || _fotoPath != null)
+                                  ? 'Volver a tomar foto'
+                                  : 'Tomar foto del acta',
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
+                  ),
+                  const SizedBox(height: 24),
+                  PrimaryButton(
+                    label: 'Guardar acta',
+                    icon: Icons.save_outlined,
+                    onPressed: _capturing ? null : _save,
                   ),
                 ],
               ),
@@ -324,97 +388,52 @@ class _ActaFormPageState extends State<ActaFormPage> {
     );
   }
 
-  Widget _buildOrgField(OrganizacionPolitica o) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: TextFormField(
-        controller: _votosCtrls[o.id],
-        keyboardType: TextInputType.number,
-        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-        decoration: InputDecoration(
-          labelText: '${o.lista} - ${o.nombre}',
-          helperText: 'Candidato: ${o.candidato}',
-          prefixIcon: const Icon(Icons.how_to_vote),
+  Widget _buildPhotoPreview() {
+    if (_fotoLocalPath != null && File(_fotoLocalPath!).existsSync()) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(AppDecorations.cardRadius),
+        child: Image.file(
+          File(_fotoLocalPath!),
+          height: 180,
+          width: double.infinity,
+          fit: BoxFit.cover,
         ),
-        validator: (v) {
-          final n = int.tryParse(v ?? '');
-          if (n == null || n < 0) return 'Valor invalido';
-          return null;
-        },
+      );
+    }
+    if (_fotoPath != null) {
+      return Container(
+        height: 100,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: AppTheme.successColor.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: const Text('Foto ya registrada en el servidor'),
+      );
+    }
+    return Container(
+      height: 120,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: AppTheme.inputFillColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.borderColor),
       ),
-    );
-  }
-
-  Widget _buildNumberField(String label, TextEditingController ctrl) {
-    return TextFormField(
-      controller: ctrl,
-      keyboardType: TextInputType.number,
-      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: const Icon(Icons.numbers),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.add_a_photo_outlined,
+            color: AppTheme.textSecondaryColor.withValues(alpha: 0.6),
+            size: 32,
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Sin foto capturada',
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+        ],
       ),
-      validator: (v) {
-        final n = int.tryParse(v ?? '');
-        if (n == null || n < 0) return 'Valor invalido';
-        return null;
-      },
-    );
-  }
-
-  Widget _buildPhotoSection() {
-    final hasPhoto = _fotoLocalPath != null || _fotoPath != null;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const Text(
-          'Foto del acta + GPS',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 8),
-        if (_fotoLocalPath != null && File(_fotoLocalPath!).existsSync())
-          ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: Image.file(
-              File(_fotoLocalPath!),
-              height: 180,
-              width: double.infinity,
-              fit: BoxFit.cover,
-            ),
-          )
-        else if (_fotoPath != null)
-          Container(
-            height: 100,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: Colors.green.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Text('Foto ya registrada en el servidor'),
-          ),
-        const SizedBox(height: 8),
-        if (_sharpness != null)
-          Text(
-            'Nitidez (Laplaciano): ${_sharpness!.toStringAsFixed(0)} '
-            '(min ${BlurDetector.minLaplacianVariance.toStringAsFixed(0)})',
-          ),
-        if (_lat != null && _lng != null)
-          Text(
-            'GPS: ${_lat!.toStringAsFixed(5)}, ${_lng!.toStringAsFixed(5)}',
-          ),
-        const SizedBox(height: 8),
-        OutlinedButton.icon(
-          onPressed: _capturing ? null : _capturarFotoYGps,
-          icon: _capturing
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.camera_alt),
-          label: Text(hasPhoto ? 'Volver a tomar foto' : 'Tomar foto del acta'),
-        ),
-      ],
     );
   }
 }

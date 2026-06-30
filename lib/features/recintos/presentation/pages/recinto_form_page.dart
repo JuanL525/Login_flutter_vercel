@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../core/theme/app_decorations.dart';
+import '../../../../core/widgets/primary_button.dart';
 import '../../../../core/widgets/user_message_dialog.dart';
 import '../../../../injection_container.dart';
 import '../../../auth/presentation/widgets/custom_text_field.dart';
@@ -109,77 +111,78 @@ class _RecintoFormViewState extends State<_RecintoFormView> {
             isLoading: isLoading,
             child: SafeArea(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(24),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      CustomTextField(
-                        controller: _provincia,
-                        label: 'Provincia',
-                        hint: 'Pichincha',
-                        prefixIcon: Icons.map_outlined,
-                        validator: _required,
-                      ),
-                      const SizedBox(height: 16),
-                      CustomTextField(
-                        controller: _canton,
-                        label: 'Canton',
-                        hint: 'Quito',
-                        prefixIcon: Icons.location_city_outlined,
-                        validator: _required,
-                      ),
-                      const SizedBox(height: 16),
-                      CustomTextField(
-                        controller: _parroquia,
-                        label: 'Parroquia',
-                        hint: 'Calderon',
-                        prefixIcon: Icons.place_outlined,
-                        validator: _required,
-                      ),
-                      const SizedBox(height: 16),
-                      CustomTextField(
-                        controller: _nombre,
-                        label: 'Nombre del recinto',
-                        hint: 'Unidad Educativa...',
-                        prefixIcon: Icons.school_outlined,
-                        validator: _required,
-                      ),
-                      if (!_isEdit) ...[
+                padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
+                child: Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: AppDecorations.floatingForm(),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        CustomTextField(
+                          controller: _provincia,
+                          label: 'Provincia',
+                          hint: 'Pichincha',
+                          prefixIcon: Icons.map_outlined,
+                          validator: _required,
+                        ),
                         const SizedBox(height: 16),
                         CustomTextField(
-                          controller: _cantidadMesas,
-                          label: 'Cantidad de mesas (JRV)',
-                          hint: '4',
-                          prefixIcon: Icons.table_rows_outlined,
-                          keyboardType: TextInputType.number,
-                          validator: (v) {
-                            if (v == null || v.trim().isEmpty) {
-                              return 'Ingrese la cantidad de mesas';
-                            }
-                            final n = int.tryParse(v.trim());
-                            if (n == null || n < 1 || n > 50) {
-                              return 'Debe ser un numero entre 1 y 50';
-                            }
-                            return null;
-                          },
+                          controller: _canton,
+                          label: 'Cantón',
+                          hint: 'Quito',
+                          prefixIcon: Icons.location_city_outlined,
+                          validator: _required,
                         ),
-                        const SizedBox(height: 8),
-                        const Text(
-                          'Se crearan mesas numeradas del 1 al valor indicado.',
-                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                        const SizedBox(height: 16),
+                        CustomTextField(
+                          controller: _parroquia,
+                          label: 'Parroquia',
+                          hint: 'Calderon',
+                          prefixIcon: Icons.place_outlined,
+                          validator: _required,
+                        ),
+                        const SizedBox(height: 16),
+                        CustomTextField(
+                          controller: _nombre,
+                          label: 'Nombre del recinto',
+                          hint: 'Unidad Educativa...',
+                          prefixIcon: Icons.school_outlined,
+                          validator: _required,
+                        ),
+                        if (!_isEdit) ...[
+                          const SizedBox(height: 16),
+                          CustomTextField(
+                            controller: _cantidadMesas,
+                            label: 'Cantidad de mesas (JRV)',
+                            hint: '4',
+                            prefixIcon: Icons.table_rows_outlined,
+                            keyboardType: TextInputType.number,
+                            validator: (v) {
+                              if (v == null || v.trim().isEmpty) {
+                                return 'Ingrese la cantidad de mesas';
+                              }
+                              final n = int.tryParse(v.trim());
+                              if (n == null || n < 1 || n > 50) {
+                                return 'Debe ser un número entre 1 y 50';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Se crearán mesas numeradas del 1 al valor indicado.',
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 12),
+                          ),
+                        ],
+                        const SizedBox(height: 24),
+                        PrimaryButton(
+                          label: _isEdit ? 'Guardar cambios' : 'Crear recinto con mesas',
+                          onPressed: isLoading ? null : _submit,
                         ),
                       ],
-                      const SizedBox(height: 24),
-                      SizedBox(
-                        height: 56,
-                        child: ElevatedButton(
-                          onPressed: isLoading ? null : _submit,
-                          child: Text(_isEdit ? 'Guardar cambios' : 'Crear recinto con mesas'),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ),

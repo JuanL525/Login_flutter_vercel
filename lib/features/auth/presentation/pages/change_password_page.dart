@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../core/theme/app_decorations.dart';
+import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/primary_button.dart';
+import '../../../../core/widgets/screen_entrance.dart';
 import '../../../../core/widgets/user_message_dialog.dart';
 import '../bloc/auth_bloc.dart';
 import '../bloc/auth_event.dart';
@@ -41,21 +45,21 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
     return Scaffold(
       appBar: widget.mandatory
           ? null
-          : AppBar(title: const Text('Cambiar contrasena')),
+          : AppBar(title: const Text('Cambiar contraseña')),
       body: BlocConsumer<AuthBloc, AuthState>(
         listener: (context, state) async {
           if (state is AuthAuthenticated && !widget.mandatory) {
             await UserMessageDialog.showSuccess(
               context,
-              title: 'Contrasena actualizada',
-              message: 'Tu nueva contrasena quedo guardada correctamente.',
+              title: 'Contraseña actualizada',
+              message: 'Tu nueva contraseña quedó guardada correctamente.',
             );
             if (context.mounted) Navigator.of(context).pop();
           } else if (state is AuthAuthenticated && widget.mandatory) {
             await UserMessageDialog.showSuccess(
               context,
-              title: 'Contrasena actualizada',
-              message: 'Ya puedes usar la aplicacion con tu nueva contrasena.',
+              title: 'Contraseña actualizada',
+              message: 'Ya puedes usar la aplicación con tu nueva contraseña.',
             );
           }
         },
@@ -66,85 +70,99 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
             child: SafeArea(
               child: Center(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(24),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Icon(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 80,
+                        height: 80,
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryColor,
+                          borderRadius: BorderRadius.circular(22),
+                          boxShadow: AppDecorations.softShadow,
+                        ),
+                        child: const Icon(
                           Icons.password_rounded,
-                          size: 72,
-                          color: Theme.of(context).colorScheme.primary,
+                          color: Colors.white,
+                          size: 38,
                         ),
-                        const SizedBox(height: 24),
+                      ).fadeSlideUp(),
+                      const SizedBox(height: 24),
+                      Text(
+                        widget.mandatory
+                            ? 'Cambia tu contraseña'
+                            : 'Nueva contraseña',
+                        style: Theme.of(context).textTheme.displayMedium,
+                        textAlign: TextAlign.center,
+                      ).fadeSlideUp(delay: const Duration(milliseconds: 80)),
+                      const SizedBox(height: 8),
+                      if (widget.mandatory)
                         Text(
-                          widget.mandatory
-                              ? 'Cambia tu contrasena'
-                              : 'Nueva contrasena',
-                          style: Theme.of(context).textTheme.displayMedium,
+                          'Por seguridad debes cambiar la contraseña inicial '
+                          'antes de continuar.',
+                          style: Theme.of(context).textTheme.bodyMedium,
                           textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 8),
-                        if (widget.mandatory)
-                          Text(
-                            'Por seguridad debes cambiar la contrasena inicial '
-                            'antes de continuar.',
-                            style: Theme.of(context).textTheme.bodyMedium,
-                            textAlign: TextAlign.center,
+                        ).fadeSlideUp(delay: const Duration(milliseconds: 120)),
+                      const SizedBox(height: 32),
+                      Container(
+                        padding: const EdgeInsets.all(28),
+                        decoration: AppDecorations.floatingForm(),
+                        child: Form(
+                          key: _formKey,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              CustomTextField(
+                                controller: _passwordController,
+                                label: 'Nueva contraseña',
+                                hint: '********',
+                                prefixIcon: Icons.lock_outline,
+                                isPassword: true,
+                                validator: (value) {
+                                  if (value == null || value.length < 6) {
+                                    return 'Mínimo 6 caracteres';
+                                  }
+                                  if (value == 'Ecuador2026') {
+                                    return 'No puede ser la contraseña inicial';
+                                  }
+                                  return null;
+                                },
+                              ),
+                              const SizedBox(height: 16),
+                              CustomTextField(
+                                controller: _confirmController,
+                                label: 'Confirmar contraseña',
+                                hint: '********',
+                                prefixIcon: Icons.lock_outline,
+                                isPassword: true,
+                                validator: (value) {
+                                  if (value != _passwordController.text) {
+                                    return 'Las contraseñas no coinciden';
+                                  }
+                                  return null;
+                                },
+                              ),
+                              const SizedBox(height: 24),
+                              PrimaryButton(
+                                label: 'Guardar',
+                                onPressed: isLoading ? null : _handleSubmit,
+                              ),
+                              if (widget.mandatory) ...[
+                                const SizedBox(height: 8),
+                                TextButton(
+                                  onPressed: isLoading
+                                      ? null
+                                      : () => context
+                                          .read<AuthBloc>()
+                                          .add(const SignOutRequested()),
+                                  child: const Text('Cerrar sesión'),
+                                ),
+                              ],
+                            ],
                           ),
-                        const SizedBox(height: 32),
-                        CustomTextField(
-                          controller: _passwordController,
-                          label: 'Nueva contrasena',
-                          hint: '********',
-                          prefixIcon: Icons.lock_outline,
-                          isPassword: true,
-                          validator: (value) {
-                            if (value == null || value.length < 6) {
-                              return 'Minimo 6 caracteres';
-                            }
-                            if (value == 'Ecuador2026') {
-                              return 'No puede ser la contrasena inicial';
-                            }
-                            return null;
-                          },
                         ),
-                        const SizedBox(height: 16),
-                        CustomTextField(
-                          controller: _confirmController,
-                          label: 'Confirmar contrasena',
-                          hint: '********',
-                          prefixIcon: Icons.lock_outline,
-                          isPassword: true,
-                          validator: (value) {
-                            if (value != _passwordController.text) {
-                              return 'Las contrasenas no coinciden';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 32),
-                        SizedBox(
-                          height: 56,
-                          child: ElevatedButton(
-                            onPressed: isLoading ? null : _handleSubmit,
-                            child: const Text('Guardar'),
-                          ),
-                        ),
-                        if (widget.mandatory) ...[
-                          const SizedBox(height: 12),
-                          TextButton(
-                            onPressed: isLoading
-                                ? null
-                                : () => context
-                                    .read<AuthBloc>()
-                                    .add(const SignOutRequested()),
-                            child: const Text('Cerrar sesion'),
-                          ),
-                        ],
-                      ],
-                    ),
+                      ).fadeSlideUp(delay: const Duration(milliseconds: 160)),
+                    ],
                   ),
                 ),
               ),

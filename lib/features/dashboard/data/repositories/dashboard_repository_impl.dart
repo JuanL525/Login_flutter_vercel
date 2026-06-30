@@ -18,6 +18,24 @@ class DashboardRepositoryImpl implements DashboardRepository {
     try {
       final recintosRows =
           await supabaseClient.from('recintos').select().order('parroquia');
+
+      final coordIds = <String>{};
+      for (final r in (recintosRows as List)) {
+        final id = (r as Map<String, dynamic>)['coordinador_id'] as String?;
+        if (id != null) coordIds.add(id);
+      }
+
+      final coordProfiles = <String, Map<String, dynamic>>{};
+      if (coordIds.isNotEmpty) {
+        final profileRows = await supabaseClient
+            .from('profiles')
+            .select('id, nombres, apellidos, cedula')
+            .inFilter('id', coordIds.toList());
+        for (final p in (profileRows as List)) {
+          final map = p as Map<String, dynamic>;
+          coordProfiles[map['id'] as String] = map;
+        }
+      }
       final mesasRows = await supabaseClient
           .from('mesas')
           .select('id, recinto_id, actas(count)');
@@ -45,10 +63,24 @@ class DashboardRepositoryImpl implements DashboardRepository {
 
       final avances = (recintosRows as List).map((r) {
         final recinto = RecintoModel.fromMap(r as Map<String, dynamic>);
+        String? coordNombre;
+        String? coordCedula;
+        final coordId = recinto.coordinadorId;
+        if (coordId != null) {
+          final profile = coordProfiles[coordId];
+          if (profile != null) {
+            final n = profile['nombres'] as String? ?? '';
+            final a = profile['apellidos'] as String? ?? '';
+            coordNombre = '$n $a'.trim();
+            coordCedula = profile['cedula'] as String?;
+          }
+        }
         return RecintoAvance(
           recinto: recinto,
           totalMesas: mesasPorRecinto[recinto.id] ?? 0,
           actasRegistradas: actasPorRecinto[recinto.id] ?? 0,
+          coordinadorNombre: coordNombre,
+          coordinadorCedula: coordCedula,
         );
       }).toList();
 

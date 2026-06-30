@@ -2,6 +2,11 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/seeds/organizaciones_seed.dart';
+import '../../../../core/theme/app_decorations.dart';
+import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/ios_settings_group.dart';
+import '../../../../core/widgets/scale_on_tap.dart';
+import '../../../../core/widgets/soft_card.dart';
 import '../../../../injection_container.dart';
 import '../../domain/entities/acta_entity.dart';
 import '../../domain/usecases/get_photo_url.dart';
@@ -43,8 +48,6 @@ class _ActaDetailPageState extends State<ActaDetailPage> {
     final lat = acta.gpsLat!;
     final lng = acta.gpsLng!;
 
-    // Intentar abrir la app de Google Maps nativa primero (geo:).
-    // Si no está instalada o falla, caer a la URL web.
     final geoUri = Uri.parse('geo:$lat,$lng?q=$lat,$lng(Acta)');
     final webUri = Uri.parse(
       'https://www.google.com/maps/search/?api=1&query=$lat,$lng',
@@ -65,7 +68,9 @@ class _ActaDetailPageState extends State<ActaDetailPage> {
     if (!launched && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('No se pudo abrir el mapa. Verifica que tienes una app de mapas instalada.'),
+          content: Text(
+            'No se pudo abrir el mapa. Verifica que tienes una app de mapas instalada.',
+          ),
         ),
       );
     }
@@ -81,60 +86,84 @@ class _ActaDetailPageState extends State<ActaDetailPage> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          _buildPhoto(acta),
-          const SizedBox(height: 16),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Resultados',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 12),
-                  ...orgs.map(
-                    (o) => Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(child: Text('${o.lista} - ${o.nombre}')),
-                          Text(
-                            '${acta.votos[o.id] ?? 0}',
-                            style:
-                                const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const Divider(),
-                  _row('Votos en blanco', acta.votosBlancos),
-                  _row('Votos nulos', acta.votosNulos),
-                  _row('Total sufragantes', acta.totalSufragantes),
-                ],
-              ),
-            ),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(AppDecorations.cardRadius),
+            child: _buildPhoto(acta),
           ),
           const SizedBox(height: 16),
-          Card(
-            child: ListTile(
-              leading: const Icon(Icons.location_on_outlined),
-              title: const Text('Coordenadas GPS'),
-              subtitle: Text(
-                acta.gpsLat != null
-                    ? '${acta.gpsLat!.toStringAsFixed(6)}, '
-                        '${acta.gpsLng!.toStringAsFixed(6)}'
-                    : 'No registradas',
+          IosSettingsGroup(
+            label: 'Resultados',
+            children: [
+              for (var i = 0; i < orgs.length; i++)
+                IosSettingsRow(
+                  title: '${orgs[i].lista} - ${orgs[i].nombre}',
+                  showDivider: i < orgs.length - 1,
+                  trailing: Text(
+                    '${acta.votos[orgs[i].id] ?? 0}',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 16,
+                      color: AppTheme.primaryColor,
+                    ),
+                  ),
+                ),
+              IosSettingsRow(
+                title: 'Votos en blanco',
+                trailing: _valueText(acta.votosBlancos),
               ),
-              trailing: acta.gpsLat != null
-                  ? IconButton(
-                      icon: const Icon(Icons.map),
+              IosSettingsRow(
+                title: 'Votos nulos',
+                trailing: _valueText(acta.votosNulos),
+              ),
+              IosSettingsRow(
+                title: 'Total sufragantes',
+                showDivider: false,
+                trailing: _valueText(acta.totalSufragantes),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          SoftCard(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppTheme.accentColor.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(Icons.location_on_outlined, color: AppTheme.accentColor),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Coordenadas GPS',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        acta.gpsLat != null
+                            ? '${acta.gpsLat!.toStringAsFixed(6)}, '
+                                '${acta.gpsLng!.toStringAsFixed(6)}'
+                            : 'No registradas',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    ],
+                  ),
+                ),
+                if (acta.gpsLat != null)
+                  ScaleOnTap(
+                    onTap: _openMaps,
+                    child: IconButton(
+                      icon: const Icon(Icons.map_outlined),
                       onPressed: _openMaps,
-                    )
-                  : null,
+                    ),
+                  ),
+              ],
             ),
           ),
         ],
@@ -142,15 +171,13 @@ class _ActaDetailPageState extends State<ActaDetailPage> {
     );
   }
 
-  Widget _row(String label, int value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label),
-          Text('$value', style: const TextStyle(fontWeight: FontWeight.bold)),
-        ],
+  Widget _valueText(int value) {
+    return Text(
+      '$value',
+      style: const TextStyle(
+        fontWeight: FontWeight.w800,
+        fontSize: 16,
+        color: AppTheme.primaryColor,
       ),
     );
   }
@@ -163,26 +190,20 @@ class _ActaDetailPageState extends State<ActaDetailPage> {
       );
     }
     if (_signedUrl != null) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: Image.network(
-          _signedUrl!,
-          height: 220,
-          width: double.infinity,
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => _noPhoto(),
-        ),
+      return Image.network(
+        _signedUrl!,
+        height: 220,
+        width: double.infinity,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _noPhoto(),
       );
     }
     if (acta.fotoLocalPath != null && File(acta.fotoLocalPath!).existsSync()) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: Image.file(
-          File(acta.fotoLocalPath!),
-          height: 220,
-          width: double.infinity,
-          fit: BoxFit.cover,
-        ),
+      return Image.file(
+        File(acta.fotoLocalPath!),
+        height: 220,
+        width: double.infinity,
+        fit: BoxFit.cover,
       );
     }
     return _noPhoto();
@@ -193,10 +214,14 @@ class _ActaDetailPageState extends State<ActaDetailPage> {
       height: 160,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: Colors.grey.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(12),
+        color: AppTheme.inputFillColor,
+        borderRadius: BorderRadius.circular(AppDecorations.cardRadius),
+        border: Border.all(color: AppTheme.borderColor),
       ),
-      child: const Text('Sin foto disponible'),
+      child: Text(
+        'Sin foto disponible',
+        style: Theme.of(context).textTheme.bodyMedium,
+      ),
     );
   }
 }

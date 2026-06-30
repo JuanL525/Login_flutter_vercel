@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/enums.dart';
+import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/screen_entrance.dart';
+import '../../../../core/widgets/soft_card.dart';
+import '../../../../core/widgets/status_chip.dart';
 import '../../../../injection_container.dart';
 import '../../../actas/presentation/pages/mesa_actas_page.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
@@ -16,14 +20,10 @@ import '../../domain/entities/mesa_entity.dart';
 import '../bloc/mesas_bloc.dart';
 
 /// Pantalla del coordinador de recinto: ver mesas, asignar/reasignar veedores
-/// y entrar al detalle (actas) de cada mesa. Tambien la usa el provincial en
-/// modo solo lectura (canManage=false).
+/// y entrar al detalle (actas) de cada mesa.
 class MesasRecintoPage extends StatelessWidget {
   final String recintoId;
   final bool canManage;
-
-  /// Cuando se usa como home del coordinador: muestra logout y edicion de su
-  /// propio recinto.
   final bool isHome;
 
   const MesasRecintoPage({
@@ -96,7 +96,7 @@ class _MesasViewState extends State<_MesasView> {
         actions: [
           if (widget.isHome)
             IconButton(
-              icon: const Icon(Icons.refresh),
+              icon: const Icon(Icons.refresh_rounded),
               tooltip: 'Recargar',
               onPressed: _refreshAll,
             ),
@@ -115,7 +115,7 @@ class _MesasViewState extends State<_MesasView> {
             ),
           if (widget.isHome)
             IconButton(
-              icon: const Icon(Icons.logout),
+              icon: const Icon(Icons.logout_rounded),
               onPressed: () =>
                   context.read<AuthBloc>().add(const SignOutRequested()),
             ),
@@ -139,7 +139,7 @@ class _MesasViewState extends State<_MesasView> {
                       .add(LoadMesasByRecinto(widget.recintoId));
                 }
               },
-              icon: const Icon(Icons.person_add_alt),
+              icon: const Icon(Icons.person_add_alt_outlined),
               label: const Text('Crear veedor'),
             )
           : null,
@@ -187,9 +187,14 @@ class _MesasViewState extends State<_MesasView> {
                     onRefresh: _refreshAll,
                     child: ListView(
                       physics: const AlwaysScrollableScrollPhysics(),
-                      children: const [
-                        SizedBox(height: 120),
-                        Center(child: Text('No hay mesas en este recinto')),
+                      children: [
+                        const SizedBox(height: 120),
+                        Center(
+                          child: Text(
+                            'No hay mesas en este recinto',
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                        ),
                       ],
                     ),
                   );
@@ -208,6 +213,7 @@ class _MesasViewState extends State<_MesasView> {
                         canManage: widget.canManage,
                         veedores: loaded.veedores,
                         recintoId: widget.recintoId,
+                        index: i,
                       );
                     },
                   ),
@@ -226,68 +232,88 @@ class _MesaCard extends StatelessWidget {
   final bool canManage;
   final List<ProfileEntity> veedores;
   final String recintoId;
+  final int index;
 
   const _MesaCard({
     required this.mesa,
     required this.canManage,
     required this.veedores,
     required this.recintoId,
+    required this.index,
   });
 
-  Color _statusColor(BuildContext context) {
-    if (mesa.completa) return Colors.green;
-    if (mesa.sinIniciar) return Colors.orange;
-    return Colors.blue;
-  }
+  AppStatusType get _statusType =>
+      StatusChip.forMesa(completa: mesa.completa, sinIniciar: mesa.sinIniciar);
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: ListTile(
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        leading: CircleAvatar(
-          backgroundColor: _statusColor(context).withValues(alpha: 0.15),
-          child: Text(
-            'JRV',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
-              color: _statusColor(context),
+    return SoftCard(
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => MesaActasPage(
+              mesaId: mesa.id,
+              numeroJrv: mesa.numeroJrv,
+              readOnly: !canManage,
             ),
           ),
-        ),
-        title: Text('Mesa ${mesa.numeroJrv}'),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Veedor: ${mesa.veedorNombre ?? 'sin asignar'}'),
-            Text(
-              '${mesa.estadoLabel} (${mesa.actasRegistradas}/2 actas)',
-              style: TextStyle(color: _statusColor(context)),
+        );
+      },
+      padding: const EdgeInsets.all(18),
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: AppTheme.primaryColor.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(14),
             ),
-          ],
-        ),
-        trailing: canManage
-            ? IconButton(
-                icon: const Icon(Icons.manage_accounts_outlined),
-                tooltip: 'Asignar veedor',
-                onPressed: () => _showAssignSheet(context),
-              )
-            : const Icon(Icons.chevron_right),
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => MesaActasPage(
-                mesaId: mesa.id,
-                numeroJrv: mesa.numeroJrv,
-                readOnly: !canManage,
+            alignment: Alignment.center,
+            child: Text(
+              '${mesa.numeroJrv}',
+              style: const TextStyle(
+                fontWeight: FontWeight.w800,
+                color: AppTheme.primaryColor,
               ),
             ),
-          );
-        },
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Mesa ${mesa.numeroJrv}',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Veedor: ${mesa.veedorNombre ?? 'sin asignar'}',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 13),
+                ),
+                const SizedBox(height: 6),
+                StatusChip(
+                  label: '${mesa.estadoLabel} · ${mesa.actasRegistradas}/2',
+                  type: _statusType,
+                ),
+              ],
+            ),
+          ),
+          if (canManage)
+            IconButton(
+              icon: const Icon(Icons.manage_accounts_outlined),
+              tooltip: 'Asignar veedor',
+              onPressed: () => _showAssignSheet(context),
+            )
+          else
+            Icon(
+              Icons.chevron_right_rounded,
+              color: AppTheme.textSecondaryColor.withValues(alpha: 0.6),
+            ),
+        ],
       ),
-    );
+    ).staggered(index);
   }
 
   void _showAssignSheet(BuildContext context) {
@@ -296,57 +322,85 @@ class _MesaCard extends StatelessWidget {
       context: context,
       builder: (_) {
         return SafeArea(
-          child: ListView(
-            shrinkWrap: true,
-            children: [
-              const Padding(
-                padding: EdgeInsets.all(16),
-                child: Text(
-                  'Asignar veedor a la mesa',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Asignar veedor',
+                  style: Theme.of(context).textTheme.titleLarge,
                 ),
-              ),
-              if (veedores.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Text('No hay veedores. Crea uno primero.'),
+                const SizedBox(height: 4),
+                Text(
+                  'Mesa ${mesa.numeroJrv}',
+                  style: Theme.of(context).textTheme.bodyMedium,
                 ),
-              ...veedores.map(
-                (v) => ListTile(
-                  leading: const Icon(Icons.person),
-                  title: Text(v.nombreCompleto),
-                  subtitle: Text('Cedula: ${v.cedula}'),
-                  trailing: mesa.veedorId == v.id
-                      ? const Icon(Icons.check, color: Colors.green)
-                      : null,
-                  onTap: () {
-                    bloc.add(
-                      AssignVeedorRequested(
-                        mesaId: mesa.id,
-                        veedorId: v.id,
-                        recintoId: recintoId,
+                const SizedBox(height: 16),
+                if (veedores.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: Text(
+                      'No hay veedores. Crea uno primero.',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  )
+                else
+                  ...veedores.map(
+                    (v) => SoftCard(
+                      onTap: () {
+                        bloc.add(
+                          AssignVeedorRequested(
+                            mesaId: mesa.id,
+                            veedorId: v.id,
+                            recintoId: recintoId,
+                          ),
+                        );
+                        Navigator.of(context).pop();
+                      },
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      radius: 16,
+                      margin: const EdgeInsets.only(bottom: 8),
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.1),
+                            child: const Icon(Icons.person_outline, color: AppTheme.primaryColor),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(v.nombreCompleto, style: const TextStyle(fontWeight: FontWeight.w600)),
+                                Text('Cédula: ${v.cedula}', style: Theme.of(context).textTheme.bodyMedium),
+                              ],
+                            ),
+                          ),
+                          if (mesa.veedorId == v.id)
+                            const Icon(Icons.check_circle, color: AppTheme.successColor),
+                        ],
                       ),
-                    );
-                    Navigator.of(context).pop();
-                  },
-                ),
-              ),
-              if (mesa.veedorId != null)
-                ListTile(
-                  leading: const Icon(Icons.person_off, color: Colors.red),
-                  title: const Text('Quitar asignacion'),
-                  onTap: () {
-                    bloc.add(
-                      AssignVeedorRequested(
-                        mesaId: mesa.id,
-                        veedorId: null,
-                        recintoId: recintoId,
-                      ),
-                    );
-                    Navigator.of(context).pop();
-                  },
-                ),
-            ],
+                    ),
+                  ),
+                if (mesa.veedorId != null)
+                  ListTile(
+                    leading: Icon(Icons.person_off_outlined, color: Theme.of(context).colorScheme.error),
+                    title: const Text('Quitar asignación'),
+                    onTap: () {
+                      bloc.add(
+                        AssignVeedorRequested(
+                          mesaId: mesa.id,
+                          veedorId: null,
+                          recintoId: recintoId,
+                        ),
+                      );
+                      Navigator.of(context).pop();
+                    },
+                  ),
+              ],
+            ),
           ),
         );
       },
@@ -365,13 +419,13 @@ class _ErrorView extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.error_outline, size: 48, color: Colors.red),
+          Icon(Icons.error_outline_rounded, size: 48, color: Theme.of(context).colorScheme.error),
           const SizedBox(height: 12),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 32),
             child: Text(message, textAlign: TextAlign.center),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           ElevatedButton(onPressed: onRetry, child: const Text('Reintentar')),
         ],
       ),

@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/enums.dart';
+import '../../../../core/theme/app_decorations.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../../core/validators/cedula_validator.dart';
+import '../../../../core/widgets/primary_button.dart';
+import '../../../../core/widgets/soft_card.dart';
 import '../../../../core/widgets/user_message_dialog.dart';
 import '../../../../injection_container.dart';
 import '../../../auth/presentation/widgets/custom_text_field.dart';
 import '../../../auth/presentation/widgets/loading_overlay.dart';
 import '../bloc/users_bloc.dart';
 
-/// Formulario reutilizable para crear coordinadores de recinto (rol recinto)
-/// o veedores (rol veedor). El recintoId se fija segun quien crea.
+/// Formulario reutilizable para crear coordinadores de recinto o veedores.
 class CreateUserPage extends StatelessWidget {
   final UserRole role;
   final String? recintoId;
@@ -95,10 +98,10 @@ class _CreateUserViewState extends State<_CreateUserView> {
             await UserMessageDialog.showSuccess(
               context,
               title: 'Cuenta creada',
-              message: 'Se envio un correo de verificacion a la direccion '
+              message: 'Se envió un correo de verificación a la dirección '
                   'registrada. El usuario debe verificar su cuenta antes de '
                   'ingresar por primera vez.\n\n'
-                  'Contrasena inicial: Ecuador2026',
+                  'Contraseña inicial: Ecuador2026',
               buttonText: 'Entendido',
             );
             if (context.mounted) Navigator.of(context).pop(true);
@@ -111,114 +114,114 @@ class _CreateUserViewState extends State<_CreateUserView> {
             child: SafeArea(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(24),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      CustomTextField(
-                        controller: _cedula,
-                        label: 'Cedula',
-                        hint: '10 digitos',
-                        prefixIcon: Icons.badge_outlined,
-                        keyboardType: TextInputType.number,
-                        validator: CedulaValidator.validate,
+                child: Column(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: AppDecorations.floatingForm(),
+                      child: Form(
+                        key: _formKey,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            CustomTextField(
+                              controller: _cedula,
+                              label: 'Cédula',
+                              hint: '10 dígitos',
+                              prefixIcon: Icons.badge_outlined,
+                              keyboardType: TextInputType.number,
+                              validator: CedulaValidator.validate,
+                            ),
+                            const SizedBox(height: 16),
+                            CustomTextField(
+                              controller: _nombres,
+                              label: 'Nombres completos',
+                              hint: 'Nombres',
+                              prefixIcon: Icons.person_outline,
+                              validator: _required,
+                            ),
+                            const SizedBox(height: 16),
+                            CustomTextField(
+                              controller: _apellidos,
+                              label: 'Apellidos completos',
+                              hint: 'Apellidos',
+                              prefixIcon: Icons.person_outline,
+                              validator: _required,
+                            ),
+                            const SizedBox(height: 16),
+                            CustomTextField(
+                              controller: _telefono,
+                              label: 'Teléfono de contacto',
+                              hint: '09xxxxxxxx',
+                              prefixIcon: Icons.phone_outlined,
+                              keyboardType: TextInputType.phone,
+                              validator: _required,
+                            ),
+                            const SizedBox(height: 16),
+                            CustomTextField(
+                              controller: _email,
+                              label: 'Correo electrónico',
+                              hint: 'correo@dominio.com',
+                              prefixIcon: Icons.email_outlined,
+                              keyboardType: TextInputType.emailAddress,
+                              validator: (v) {
+                                if (v == null || v.trim().isEmpty) {
+                                  return 'Ingrese el correo';
+                                }
+                                if (!v.contains('@') || !v.contains('.')) {
+                                  return 'Correo inválido';
+                                }
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 24),
+                            PrimaryButton(
+                              label: 'Crear cuenta',
+                              onPressed: isLoading ? null : _submit,
+                            ),
+                          ],
+                        ),
                       ),
-                      const SizedBox(height: 16),
-                      CustomTextField(
-                        controller: _nombres,
-                        label: 'Nombres completos',
-                        hint: 'Nombres',
-                        prefixIcon: Icons.person_outline,
-                        validator: _required,
-                      ),
-                      const SizedBox(height: 16),
-                      CustomTextField(
-                        controller: _apellidos,
-                        label: 'Apellidos completos',
-                        hint: 'Apellidos',
-                        prefixIcon: Icons.person_outline,
-                        validator: _required,
-                      ),
-                      const SizedBox(height: 16),
-                      CustomTextField(
-                        controller: _telefono,
-                        label: 'Telefono de contacto',
-                        hint: '09xxxxxxxx',
-                        prefixIcon: Icons.phone_outlined,
-                        keyboardType: TextInputType.phone,
-                        validator: _required,
-                      ),
-                      const SizedBox(height: 16),
-                      CustomTextField(
-                        controller: _email,
-                        label: 'Correo electronico',
-                        hint: 'correo@dominio.com',
-                        prefixIcon: Icons.email_outlined,
-                        keyboardType: TextInputType.emailAddress,
-                        validator: (v) {
-                          if (v == null || v.trim().isEmpty) {
-                            return 'Ingrese el correo';
-                          }
-                          if (!v.contains('@') || !v.contains('.')) {
-                            return 'Correo invalido';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 24),
-                      Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                    ),
+                    const SizedBox(height: 16),
+                    SoftCard(
+                      padding: const EdgeInsets.all(16),
+                      radius: 20,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
                             children: [
-                              Row(
-                                children: [
-                                  const Icon(Icons.mark_email_unread_outlined),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Text(
-                                      'Se enviara un correo de verificacion. '
-                                      'El usuario debe confirmar su cuenta '
-                                      'antes de poder ingresar.',
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodyMedium,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 10),
-                              Row(
-                                children: [
-                                  const Icon(Icons.vpn_key_outlined),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Text(
-                                      'Contrasena inicial: Ecuador2026. '
-                                      'Debera cambiarla en el primer ingreso.',
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodyMedium,
-                                    ),
-                                  ),
-                                ],
+                              Icon(Icons.mark_email_unread_outlined, color: AppTheme.primaryColor.withValues(alpha: 0.8)),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  'Se enviará un correo de verificación. '
+                                  'El usuario debe confirmar su cuenta '
+                                  'antes de poder ingresar.',
+                                  style: Theme.of(context).textTheme.bodyMedium,
+                                ),
                               ),
                             ],
                           ),
-                        ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Icon(Icons.vpn_key_outlined, color: AppTheme.accentColor.withValues(alpha: 0.9)),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  'Contraseña inicial: Ecuador2026. '
+                                  'Deberá cambiarla en el primer ingreso.',
+                                  style: Theme.of(context).textTheme.bodyMedium,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 24),
-                      SizedBox(
-                        height: 56,
-                        child: ElevatedButton(
-                          onPressed: isLoading ? null : _submit,
-                          child: const Text('Crear cuenta'),
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             ),

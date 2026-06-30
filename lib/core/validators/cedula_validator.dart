@@ -43,17 +43,17 @@ class CedulaValidator {
   /// Util para usar como validator de un TextFormField.
   static String? validate(String? value) {
     if (value == null || value.isEmpty) {
-      return 'Ingrese la cedula';
+      return 'Ingrese la cédula';
     }
     if (value.length != 10 || int.tryParse(value) == null) {
-      return 'La cedula debe tener 10 digitos';
+      return 'La cédula debe tener 10 dígitos';
     }
     final provincia = int.parse(value.substring(0, 2));
     if (provincia < 1 || provincia > 24) {
-      return 'Provincia invalida (01-24)';
+      return 'Provincia inválida (01-24)';
     }
     if (!isValid(value)) {
-      return 'La cedula no es valida';
+      return 'La cédula no es válida';
     }
     return null;
   }

@@ -43,8 +43,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
       if (email == null || email.isEmpty) {
         throw Exception(
-          'No existe una cuenta registrada con esa cedula. '
-          'Verifica el numero o contacta a tu coordinador.',
+          'No existe una cuenta registrada con esa cédula. '
+          'Verifica el número o contacta a tu coordinador.',
         );
       }
 
@@ -55,7 +55,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           password: password,
         );
         if (response.user == null) {
-          throw Exception('Contrasena incorrecta');
+          throw Exception('Contraseña incorrecta');
         }
         return _fetchProfile(response.user!.id);
       } on AuthException catch (e) {
@@ -86,7 +86,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     try {
       final user = supabaseClient.auth.currentUser;
       if (user == null) {
-        throw Exception('No hay sesion activa');
+        throw Exception('No hay sesión activa');
       }
       await supabaseClient.auth.updateUser(
         UserAttributes(password: newPassword),
@@ -118,11 +118,11 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     if (passwordAttempt ||
         lower.contains('invalid login') ||
         lower.contains('invalid credentials')) {
-      return 'Contrasena incorrecta. Si es tu primer ingreso, '
+      return 'Contraseña incorrecta. Si es tu primer ingreso, '
           'recuerda que la clave inicial es Ecuador2026.';
     }
     if (lower.contains('email not confirmed')) {
-      return 'Debes confirmar tu correo electronico antes de ingresar.';
+      return 'Debes confirmar tu correo electrónico antes de ingresar.';
     }
     if (lower.contains('rate limit') || lower.contains('too many requests')) {
       return 'Demasiados intentos. Espera un momento e intenta de nuevo.';

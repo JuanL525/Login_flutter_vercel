@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+import '../../../../core/theme/app_decorations.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../users/domain/entities/profile_entity.dart';
 
 /// Banner de identidad que se muestra en el home de cada rol.
-/// Muestra nombre, cédula, rol y, opcionalmente, provincia o recinto.
 class IdentityBanner extends StatelessWidget {
   final ProfileEntity profile;
   final String? provinciaNombre;
@@ -26,79 +27,84 @@ class IdentityBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Card(
-      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      color: cs.primaryContainer,
-      elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            CircleAvatar(
-              radius: 26,
-              backgroundColor: cs.primary,
-              child: Text(
-                _initials,
-                style: TextStyle(
-                  color: cs.onPrimary,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                ),
-              ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    profile.nombreCompleto,
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                      color: cs.onPrimaryContainer,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  _InfoRow(
-                    icon: Icons.badge_outlined,
-                    text: 'C.I.: ${profile.cedula}',
-                    color: cs.onPrimaryContainer,
-                  ),
-                  _InfoRow(
-                    icon: Icons.manage_accounts_outlined,
-                    text: profile.role.label,
-                    color: cs.onPrimaryContainer,
-                  ),
-                  if (provinciaNombre != null)
-                    _InfoRow(
-                      icon: Icons.map_outlined,
-                      text: 'Provincia: $provinciaNombre',
-                      color: cs.onPrimaryContainer,
-                      bold: true,
-                    ),
-                  if (recintoNombre != null) ...[
-                    _InfoRow(
-                      icon: Icons.location_city,
-                      text: recintoNombre!,
-                      color: cs.onPrimaryContainer,
-                      bold: true,
-                    ),
-                    if (recintoUbicacion != null)
-                      _InfoRow(
-                        icon: Icons.place_outlined,
-                        text: recintoUbicacion!,
-                        color: cs.onPrimaryContainer,
-                      ),
-                  ],
-                ],
-              ),
-            ),
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      padding: const EdgeInsets.all(18),
+      decoration: AppDecorations.softSurface(radius: 24).copyWith(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppTheme.primaryColor,
+            AppTheme.secondaryColor,
           ],
         ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              _initials,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
+                fontSize: 18,
+              ),
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  profile.nombreCompleto,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
+                    color: Colors.white,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                _InfoRow(
+                  icon: Icons.badge_outlined,
+                  text: 'C.I.: ${profile.cedula}',
+                ),
+                _InfoRow(
+                  icon: Icons.manage_accounts_outlined,
+                  text: profile.role.label,
+                ),
+                if (provinciaNombre != null)
+                  _InfoRow(
+                    icon: Icons.map_outlined,
+                    text: 'Provincia: $provinciaNombre',
+                    bold: true,
+                  ),
+                if (recintoNombre != null) ...[
+                  _InfoRow(
+                    icon: Icons.location_city_outlined,
+                    text: recintoNombre!,
+                    bold: true,
+                  ),
+                  if (recintoUbicacion != null)
+                    _InfoRow(
+                      icon: Icons.place_outlined,
+                      text: recintoUbicacion!,
+                    ),
+                ],
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -107,12 +113,11 @@ class IdentityBanner extends StatelessWidget {
 class _InfoRow extends StatelessWidget {
   final IconData icon;
   final String text;
-  final Color color;
   final bool bold;
+
   const _InfoRow({
     required this.icon,
     required this.text,
-    required this.color,
     this.bold = false,
   });
 
@@ -122,14 +127,14 @@ class _InfoRow extends StatelessWidget {
       padding: const EdgeInsets.only(top: 3),
       child: Row(
         children: [
-          Icon(icon, size: 14, color: color.withValues(alpha: 0.7)),
-          const SizedBox(width: 5),
+          Icon(icon, size: 14, color: Colors.white60),
+          const SizedBox(width: 6),
           Expanded(
             child: Text(
               text,
               style: TextStyle(
                 fontSize: 13,
-                color: color.withValues(alpha: bold ? 1.0 : 0.85),
+                color: Colors.white.withValues(alpha: bold ? 1.0 : 0.85),
                 fontWeight: bold ? FontWeight.w600 : FontWeight.normal,
               ),
             ),

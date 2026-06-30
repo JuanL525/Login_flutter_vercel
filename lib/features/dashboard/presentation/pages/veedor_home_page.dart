@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/screen_entrance.dart';
+import '../../../../core/widgets/soft_card.dart';
+import '../../../../core/widgets/status_chip.dart';
+import '../../../../core/widgets/sync_banner.dart';
 import '../../../../injection_container.dart';
 import '../../../actas/presentation/pages/mesa_actas_page.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
@@ -83,29 +88,34 @@ class _VeedorViewState extends State<_VeedorView> {
               if (pending == 0) {
                 return const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 12),
-                  child: Icon(Icons.cloud_done, color: Colors.white),
+                  child: Icon(Icons.cloud_done_rounded, color: Colors.white70),
                 );
               }
               return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
                 child: Row(
                   children: [
-                    const Icon(Icons.cloud_upload, color: Colors.amber),
+                    Icon(Icons.cloud_upload_outlined, color: AppTheme.accentColor, size: 20),
                     const SizedBox(width: 4),
-                    Text('$pending'),
-                    const SizedBox(width: 4),
+                    Text(
+                      '$pending',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ],
                 ),
               );
             },
           ),
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(Icons.refresh_rounded),
             tooltip: 'Sincronizar',
             onPressed: _refreshAll,
           ),
           IconButton(
-            icon: const Icon(Icons.logout),
+            icon: const Icon(Icons.logout_rounded),
             onPressed: () =>
                 context.read<AuthBloc>().add(const SignOutRequested()),
           ),
@@ -114,6 +124,10 @@ class _VeedorViewState extends State<_VeedorView> {
       body: Column(
         children: [
           _buildBanner(),
+          ValueListenableBuilder<int>(
+            valueListenable: sync.pendingCount,
+            builder: (context, pending, _) => SyncBanner(pendingCount: pending),
+          ),
           Expanded(
             child: BlocConsumer<MesasBloc, MesasState>(
               listener: (context, state) {
@@ -135,10 +149,10 @@ class _VeedorViewState extends State<_VeedorView> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(
-                          Icons.error_outline,
+                        Icon(
+                          Icons.error_outline_rounded,
                           size: 48,
-                          color: Colors.red,
+                          color: Theme.of(context).colorScheme.error,
                         ),
                         const SizedBox(height: 12),
                         Padding(
@@ -148,7 +162,7 @@ class _VeedorViewState extends State<_VeedorView> {
                             textAlign: TextAlign.center,
                           ),
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 16),
                         ElevatedButton(
                           onPressed: _refreshAll,
                           child: const Text('Reintentar'),
@@ -159,8 +173,11 @@ class _VeedorViewState extends State<_VeedorView> {
                 }
                 final loaded = state as MesasLoaded;
                 if (loaded.mesas.isEmpty) {
-                  return const Center(
-                    child: Text('No tienes mesas asignadas todavia'),
+                  return Center(
+                    child: Text(
+                      'No tienes mesas asignadas todavía',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
                   );
                 }
                 return RefreshIndicator(
@@ -175,6 +192,7 @@ class _VeedorViewState extends State<_VeedorView> {
                       return _MesaCard(
                         mesa: mesa,
                         veedorId: widget.veedorId,
+                        index: i,
                       );
                     },
                   ),
@@ -191,42 +209,72 @@ class _VeedorViewState extends State<_VeedorView> {
 class _MesaCard extends StatelessWidget {
   final MesaEntity mesa;
   final String veedorId;
-  const _MesaCard({required this.mesa, required this.veedorId});
+  final int index;
+
+  const _MesaCard({
+    required this.mesa,
+    required this.veedorId,
+    required this.index,
+  });
+
+  AppStatusType get _statusType =>
+      StatusChip.forMesa(completa: mesa.completa, sinIniciar: mesa.sinIniciar);
 
   @override
   Widget build(BuildContext context) {
-    final color = mesa.completa
-        ? Colors.green
-        : (mesa.sinIniciar ? Colors.orange : Colors.blue);
-    return Card(
-      child: ListTile(
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        leading: CircleAvatar(
-          backgroundColor: color.withValues(alpha: 0.15),
-          child: Icon(Icons.how_to_vote, color: color),
-        ),
-        title: Text('Mesa ${mesa.numeroJrv}'),
-        subtitle: Text(
-          '${mesa.estadoLabel} (${mesa.actasRegistradas}/2 actas)',
-          style: TextStyle(color: color),
-        ),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: () async {
-          await Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => MesaActasPage(
-                mesaId: mesa.id,
-                numeroJrv: mesa.numeroJrv,
-                readOnly: false,
-              ),
+    return SoftCard(
+      onTap: () async {
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => MesaActasPage(
+              mesaId: mesa.id,
+              numeroJrv: mesa.numeroJrv,
+              readOnly: false,
             ),
-          );
-          if (context.mounted) {
-            context.read<MesasBloc>().add(LoadMesasByVeedor(veedorId));
-          }
-        },
+          ),
+        );
+        if (context.mounted) {
+          context.read<MesasBloc>().add(LoadMesasByVeedor(veedorId));
+        }
+      },
+      padding: const EdgeInsets.all(18),
+      child: Row(
+        children: [
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: AppTheme.primaryColor.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: const Icon(
+              Icons.how_to_vote_rounded,
+              color: AppTheme.primaryColor,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Mesa ${mesa.numeroJrv}',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 6),
+                StatusChip(
+                  label: '${mesa.estadoLabel} · ${mesa.actasRegistradas}/2 actas',
+                  type: _statusType,
+                ),
+              ],
+            ),
+          ),
+          Icon(
+            Icons.chevron_right_rounded,
+            color: AppTheme.textSecondaryColor.withValues(alpha: 0.6),
+          ),
+        ],
       ),
-    );
+    ).staggered(index);
   }
 }

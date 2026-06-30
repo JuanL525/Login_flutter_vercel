@@ -3,6 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'core/constants/enums.dart';
 import 'core/theme/app_theme.dart';
+import 'core/widgets/primary_button.dart';
+import 'core/widgets/screen_entrance.dart';
 import 'core/widgets/user_message_dialog.dart';
 import 'features/auth/presentation/bloc/auth_bloc.dart';
 import 'features/auth/presentation/bloc/auth_event.dart';
@@ -33,6 +35,12 @@ class MyApp extends StatelessWidget {
         title: 'Control Electoral',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.lightTheme,
+        builder: (context, child) {
+          return SafeArea(
+            top: false,
+            child: child ?? const SizedBox.shrink(),
+          );
+        },
         home: const _AuthShell(),
       ),
     );
@@ -73,8 +81,13 @@ class _RootGate extends StatelessWidget {
       builder: (context, state) {
         // Solo pantalla completa de carga al arrancar la app.
         if (state is AuthInitial) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
+          return Scaffold(
+            backgroundColor: AppTheme.backgroundColor,
+            body: Center(
+              child: CircularProgressIndicator(
+                color: AppTheme.primaryColor,
+              ),
+            ),
           );
         }
         if (state is AuthMustChangePassword) {
@@ -111,34 +124,47 @@ class _SinRecintoPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppTheme.backgroundColor,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(32),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.location_off_outlined, size: 72, color: Colors.orange),
+              Container(
+                width: 88,
+                height: 88,
+                decoration: BoxDecoration(
+                  color: AppTheme.accentColor.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: const Icon(
+                  Icons.location_off_outlined,
+                  size: 44,
+                  color: AppTheme.accentColor,
+                ),
+              ).fadeSlideUp(),
               const SizedBox(height: 24),
-              const Text(
+              Text(
                 'Sin recinto asignado',
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                style: Theme.of(context).textTheme.displayMedium?.copyWith(fontSize: 22),
                 textAlign: TextAlign.center,
-              ),
+              ).fadeSlideUp(delay: const Duration(milliseconds: 80)),
               const SizedBox(height: 16),
               Text(
                 'Hola ${profile.nombres}, tu cuenta no tiene un recinto asignado '
                 'o el recinto anterior fue eliminado.\n\n'
                 'Contacta al coordinador provincial para que te asigne a un recinto.',
-                style: const TextStyle(fontSize: 15, color: Colors.black54),
+                style: Theme.of(context).textTheme.bodyMedium,
                 textAlign: TextAlign.center,
-              ),
+              ).fadeSlideUp(delay: const Duration(milliseconds: 120)),
               const SizedBox(height: 32),
-              ElevatedButton.icon(
+              PrimaryButton(
+                label: 'Cerrar sesión',
+                icon: Icons.logout_rounded,
                 onPressed: () =>
                     context.read<AuthBloc>().add(const SignOutRequested()),
-                icon: const Icon(Icons.logout),
-                label: const Text('Cerrar sesion'),
-              ),
+              ).fadeSlideUp(delay: const Duration(milliseconds: 160)),
             ],
           ),
         ),
