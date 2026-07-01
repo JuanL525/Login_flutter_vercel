@@ -1,0 +1,824 @@
+# Guía de sustentación — Control Electoral
+
+Documento de apoyo para la defensa de la **Prueba 2: Desarrollo de Apps**. Resume cómo la aplicación cumple los requisitos del enunciado, con referencias a las líneas de código más relevantes y preguntas de práctica.
+
+---
+
+## 1. Resumen ejecutivo
+
+**Control Electoral** es una app móvil Flutter para el escrutinio electoral con tres roles jerárquicos:
+
+| Rol | Responsabilidad principal |
+|-----|---------------------------|
+| **Coordinador provincial** | Crea recintos, asigna coordinadores, ve avance global |
+| **Coordinador de recinto** | Crea veedores, asigna mesas, supervisa su recinto |
+| **Veedor de mesa** | Registra actas (alcalde/prefecto) con foto, GPS y votos |
+
+**Stack técnico:** Flutter 3.6+, **Supabase** (Auth, Postgres, Storage, Edge Functions), **Vercel** (páginas de verificación y reset de contraseña), **Drift** (SQLite local), patrón **Clean Architecture** + **BLoC**.
+
+> **Nota para la defensa:** El documento recomienda Appwrite, pero también acepta explícitamente el **mecanismo nativo de Supabase** para recuperación de contraseña (§3.2). La justificación completa de Supabase, BLoC, Clean Architecture y el flujo de correos está en la **§7**.
+
+---
+
+## 2. Mapa de requisitos → implementación
+
+| Requisito (documento) | Dónde se implementa |
+|----------------------|---------------------|
+| Login con cédula ecuatoriana | `CedulaValidator` + RPC `get_email_by_cedula` + Supabase Auth |
+| Tres roles con pantallas distintas | `_RootGate` en `main.dart` |
+| Creación jerárquica de usuarios | Edge Function `create-user` |
+| Recintos y mesas (JRV) | `recintos_remote_data_source.dart` |
+| Actas con foto obligatoria | `PhotoCaptureService` + `BlurDetector` |
+| GPS obligatorio | `GpsService` |
+| Validación votos = sufragantes | `SaveActa.validateVotos` |
+| Modo offline | Drift + `SyncService` (outbox) |
+| Seguridad por rol | RLS en `0002_rls.sql` |
+| Cambio obligatorio de contraseña | `must_change_password` + `AuthBloc._resolve` |
+| Verificación de correo | Supabase Auth + Gmail SMTP + `verify-email.html` (Vercel) |
+| Recuperación de contraseña | `resetPasswordForEmail` + `reset-password.html` (Vercel) |
+| Separación de capas (§5.2) | Clean Architecture: `domain/` → `data/` → `presentation/` |
+| Gestor de estado (§5.2) | BLoC con estados `Loading` / `Error` / `Success` explícitos |
+
+---
+
+## 3. Arquitectura de la app
+
+```
+lib/
+├── core/           # Validadores, GPS, blur, tema, Drift, widgets compartidos
+├── features/       # auth, actas, dashboard, recintos, sync, users
+│   └── <feature>/
+│       ├── domain/       # Entidades, repositorios (interfaces), use cases
+│       ├── data/         # Models, datasources, repository impl
+│       └── presentation/ # BLoC + páginas
+├── injection_container.dart   # GetIt + Injectable
+└── main.dart                    # Bootstrap y enrutamiento por rol
+```
+
+**Flujo típico (veedor guarda acta):**
+
+```
+UI (ActaDetailPage)
+  → ActasBloc → SaveActa (validación dominio)
+  → ActasRepositoryImpl → SyncService.enqueueActa
+  → Drift (local) + outbox → processOutbox → Supabase (online)
+```
+
+---
+
+## 4. Aspectos clave con código
+
+### 4.1 Arranque y enrutamiento por rol
+
+Al iniciar la app se cargan variables de entorno, se configura la inyección de dependencias y se consulta la sesión. Según el rol del perfil, se muestra la pantalla correspondiente.
+
+```22:27:lib/main.dart
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await dotenv.load(fileName: '.env');
+  await configureDependencies();
+  runApp(const MyApp());
+}
+```
+
+```104:120:lib/main.dart
+        if (state is AuthMustChangePassword) {
+          return const ChangePasswordPage(mandatory: true);
+        }
+        if (state is AuthAuthenticated) {
+          final profile = state.session.profile;
+          switch (profile.role) {
+            case UserRole.provincial:
+              return const ProvincialHomePage();
+            case UserRole.recinto:
+              final rid = profile.recintoId;
+              if (rid == null || rid.isEmpty) {
+                return _SinRecintoPage(profile: profile);
+              }
+              return RecintoHomePage(recintoId: rid);
+            case UserRole.veedor:
+              return VeedorHomePage(veedorId: profile.id);
+          }
+        }
+```
+
+**Por qué importa:** Un solo punto de entrada (`_RootGate`) centraliza la navegación post-login y evita que un veedor acceda a pantallas provinciales.
+
+---
+
+### 4.2 Autenticación con cédula (no con email visible)
+
+El usuario ingresa **cédula + contraseña**. Internamente se resuelve el email vía RPC segura y luego se usa Supabase Auth.
+
+```37:60:lib/features/auth/data/datasources/auth_remote_data_source.dart
+    try {
+      // 1. Resolver el email a partir de la cedula (RPC SECURITY DEFINER).
+      final email = await supabaseClient.rpc(
+        'get_email_by_cedula',
+        params: {'p_cedula': cedula},
+      ) as String?;
+
+      if (email == null || email.isEmpty) {
+        throw Exception(
+          'No existe una cuenta registrada con esa cédula. '
+          'Verifica el número o contacta a tu coordinador.',
+        );
+      }
+
+      // 2. Iniciar sesion con email + password.
+      try {
+        final response = await supabaseClient.auth.signInWithPassword(
+          email: email,
+          password: password,
+        );
+        if (response.user == null) {
+          throw Exception('Contraseña incorrecta');
+        }
+        return _fetchProfile(response.user!.id);
+```
+
+**Cambio obligatorio de contraseña** tras crear cuenta:
+
+```36:41:lib/features/auth/presentation/bloc/auth_bloc.dart
+  AuthState _resolve(SessionEntity session) {
+    if (session.profile.mustChangePassword) {
+      return AuthMustChangePassword(session);
+    }
+    return AuthAuthenticated(session);
+  }
+```
+
+**Mapeo de errores** (correo sin confirmar vs contraseña incorrecta):
+
+```130:141:lib/features/auth/data/datasources/auth_remote_data_source.dart
+    if (_isEmailNotConfirmed(lower, codeLower)) {
+      return 'Debes confirmar tu correo electrónico antes de ingresar. '
+          'Revisa tu bandeja de entrada (y spam) y haz clic en el enlace '
+          'de verificación.';
+    }
+
+    if (passwordAttempt ||
+        lower.contains('invalid login') ||
+        lower.contains('invalid credentials')) {
+      return 'Contraseña incorrecta. Si es tu primer ingreso, '
+          'recuerda que la clave inicial es Ecuador2026.';
+    }
+```
+
+---
+
+### 4.3 Validación de cédula ecuatoriana (módulo 10)
+
+Implementada en **Dart puro** (capa domain/core), reutilizada en formularios y replicada en la Edge Function del servidor.
+
+```16:39:lib/core/validators/cedula_validator.dart
+  static bool isValid(String cedula) {
+    if (cedula.length != 10) return false;
+    if (int.tryParse(cedula) == null) return false;
+
+    final provincia = int.parse(cedula.substring(0, 2));
+    if (provincia < 1 || provincia > 24) return false;
+
+    var sumaImpares = 0;
+    for (var i = 0; i < 9; i += 2) {
+      var producto = int.parse(cedula[i]) * 2;
+      if (producto > 9) producto -= 9;
+      sumaImpares += producto;
+    }
+
+    var sumaPares = 0;
+    for (var i = 1; i < 9; i += 2) {
+      sumaPares += int.parse(cedula[i]);
+    }
+
+    final total = sumaImpares + sumaPares;
+    final decenaSuperior = ((total + 9) ~/ 10) * 10;
+    final verificador = (decenaSuperior - total) % 10;
+
+    return verificador == int.parse(cedula[9]);
+  }
+```
+
+---
+
+### 4.4 Creación jerárquica de usuarios (Edge Function)
+
+Solo el **provincial** crea coordinadores; solo el **recinto** crea veedores. Contraseña inicial fija `Ecuador2026` y `must_change_password = true`.
+
+```1:6:supabase/functions/create-user/index.ts
+// Edge Function: create-user
+// Crea cuentas de usuario respetando la jerarquia:
+//   - provincial -> crea coordinadores de recinto
+//   - recinto    -> crea veedores de su recinto
+// Contrasena inicial fija: Ecuador2026 (must_change_password = true)
+```
+
+La función valida cédula en servidor (`isValidCedula`) antes de crear el usuario en `auth.users` y su fila en `profiles`.
+
+---
+
+### 4.5 Recintos y mesas (JRV)
+
+Al crear un recinto, se insertan automáticamente las mesas numeradas del 1 al N.
+
+```39:46:lib/features/recintos/data/datasources/recintos_remote_data_source.dart
+    // Insertar las mesas (JRV) numeradas del 1 al cantidadMesas.
+    if (cantidadMesas > 0) {
+      final mesas = List.generate(
+        cantidadMesas,
+        (i) => {'recinto_id': created.id, 'numero_jrv': i + 1},
+      );
+      await supabaseClient.from('mesas').insert(mesas);
+    }
+```
+
+---
+
+### 4.6 Asignación de coordinador a recinto
+
+Operación atómica en dos tablas: `recintos.coordinador_id` y `profiles.recinto_id`, con validaciones de unicidad.
+
+```103:117:lib/features/users/data/datasources/users_remote_data_source.dart
+    if (recintoRow['coordinador_id'] != null) {
+      throw Exception('Este recinto ya tiene un coordinador asignado');
+    }
+
+    final coordRow = await supabaseClient
+        .from('profiles')
+        .select('recinto_id, role')
+        .eq('id', coordinadorId)
+        .single();
+    if (coordRow['role'] != UserRole.recinto.dbValue) {
+      throw Exception('El usuario seleccionado no es coordinador de recinto');
+    }
+    if (coordRow['recinto_id'] != null) {
+      throw Exception('Este coordinador ya esta asignado a otro recinto');
+    }
+```
+
+---
+
+### 4.7 Registro de acta: validación de votos, foto y GPS
+
+**Dominio** — reglas de negocio antes de persistir:
+
+```24:48:lib/features/actas/domain/usecases/save_acta.dart
+  static String? validateVotos(ActaEntity acta) {
+    if (acta.totalSufragantes <= 0) {
+      return 'Ingrese el total de sufragantes';
+    }
+    // ... votos no negativos, no superan sufragantes ...
+    if (acta.votosContabilizados != acta.totalSufragantes) {
+      return 'La suma de votos (${acta.votosContabilizados}) debe ser igual al '
+          'total de sufragantes (${acta.totalSufragantes})';
+    }
+    if (acta.fotoLocalPath == null && acta.fotoPath == null) {
+      return 'Debe adjuntar la foto del acta';
+    }
+    if (acta.gpsLat == null || acta.gpsLng == null) {
+      return 'No se registraron las coordenadas GPS';
+    }
+    return null;
+  }
+```
+
+**Foto con detección de borrosidad** (varianza del Laplaciano):
+
+```56:60:lib/core/services/photo_capture_service.dart
+    final bytes = await xfile.readAsBytes();
+    final blur = _blurDetector.analyze(bytes);
+    if (!blur.isSharp) {
+      throw BlurryPhotoException(blur);
+    }
+```
+
+**GPS obligatorio** — sin permiso no continúa:
+
+```29:37:lib/core/services/gps_service.dart
+    var permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+
+    if (permission == LocationPermission.denied) {
+      throw LocationPermissionException(
+        'Permiso de ubicacion denegado. No es posible continuar.',
+      );
+    }
+```
+
+---
+
+### 4.8 Modo offline y sincronización (Outbox)
+
+Patrón **Outbox**: guardar localmente + encolar; al recuperar red, subir en FIFO.
+
+```9:19:lib/features/sync/data/sync_service.dart
+/// Servicio de sincronizacion offline (patron Outbox).
+///
+/// Flujo:
+///  - El veedor registra/corrige actas estando offline: se guardan en Drift
+///    (actas_local) y se encola una operacion en la tabla `outbox`.
+///  - Cuando vuelve la conectividad, [processOutbox] sube las operaciones
+///    pendientes en orden FIFO.
+///
+/// Resolucion de conflictos: *last-write-wins por updated_at*.
+```
+
+**Resolución de conflictos** (gana el servidor si `updated_at` remoto es más reciente):
+
+```87:101:lib/features/sync/data/sync_service.dart
+          // --- Resolucion de conflictos (last-write-wins) ---
+          final remotas = await remote.getActasByMesa(local.mesaId);
+          ActaModel? remota;
+          for (final r in remotas) {
+            if (r.dignidad == local.dignidad) {
+              remota = r;
+              break;
+            }
+          }
+          if (remota != null && remota.updatedAt.isAfter(local.updatedAt)) {
+            // El servidor tiene una version mas nueva: gana el servidor.
+            await db.upsertActaLocal(remota.toCompanion());
+            await db.removeOutbox(item.id);
+            continue;
+          }
+```
+
+**Persistencia offline-first** en el repositorio:
+
+```49:54:lib/features/actas/data/repositories/actas_repository_impl.dart
+  Future<Either<Failure, ActaEntity>> saveActa(ActaEntity acta) async {
+    try {
+      final model = ActaModel.fromEntity(acta);
+      // Guarda local + encola sincronizacion (y la intenta si hay red).
+      await syncService.enqueueActa(model);
+      return Right(model);
+```
+
+---
+
+### 4.9 Seguridad: Row Level Security (RLS)
+
+El veedor solo puede leer/escribir actas de **sus mesas asignadas**:
+
+```146:154:supabase/migrations/0002_rls.sql
+create policy actas_insert_veedor on actas
+  for insert with check (
+    current_user_role() = 'veedor'
+    and exists (
+      select 1 from mesas m
+      where m.id = actas.mesa_id
+        and m.veedor_id = auth.uid()
+    )
+  );
+```
+
+Las fotos van al bucket privado `actas-photos`; el acceso fino se controla vía políticas de Storage + RLS en `actas`.
+
+---
+
+## 5. Modelo de datos (resumen)
+
+```
+auth.users
+    └── profiles (cedula, role, recinto_id, must_change_password)
+recintos (provincia, canton, parroquia, nombre, coordinador_id)
+    └── mesas (numero_jrv, veedor_id)
+            └── actas (dignidad, votos jsonb, foto_path, gps_lat/lng, updated_at)
+```
+
+- Cada mesa puede tener **2 actas**: alcalde y prefecto.
+- Organizaciones políticas precargadas en `lib/core/seeds/organizaciones_seed.dart`.
+
+---
+
+## 6. Credenciales de demostración
+
+| Rol | Cédula | Contraseña |
+|-----|--------|------------|
+| Provincial | `1710034065` | `Ecuador2026` |
+| Coordinador recinto | `1710034073` | `Ecuador2026` |
+| Veedor | `1710034081` | `Ecuador2026` |
+
+APK release: `flutter build apk --release` → `build/app/outputs/flutter-apk/app-release.apk`
+
+---
+
+## 7. Decisiones técnicas para la sustentación
+
+Esta sección responde directamente a lo que la rúbrica pide en **§7.2 Sustentación — Justifica las decisiones técnicas (10 pts)** y a los requisitos de **§5.1 Backend**, **§5.2 Arquitectura del cliente** y **§3.1 / §3.2 Gestión de usuarios**.
+
+---
+
+### 7.1 ¿Por qué Supabase en lugar de Appwrite?
+
+**Qué dice el documento:** §5.1 recomienda Appwrite “para hacer el flujo completo en la defensa”, mencionando límites de transacciones en Supabase. También exige reglas de acceso por rol, Storage para fotos, GPS en el registro del acta y (como extra) sincronización offline.
+
+**Qué respondemos en la sustentación:**
+
+| Criterio del enunciado | Cómo lo cubre Supabase en este proyecto |
+|------------------------|----------------------------------------|
+| Auth + confirmación de correo + reset (§3.1, §3.2) | Supabase Auth nativo + SMTP (Gmail) + páginas Vercel |
+| Reglas de acceso por rol (§5.1) | **Row Level Security (RLS)** en PostgreSQL por `role`, `recinto_id`, `veedor_id` |
+| Storage de fotos de actas (§5.1) | Bucket privado `actas-photos` |
+| Modelo relacional (recintos → mesas → actas) | PostgreSQL encaja naturalmente con JOINs y agregaciones (informe de votos, avance por recinto) |
+| Creación jerárquica de usuarios (§3.1) | Edge Function `create-user` con **service role** y validación server-side |
+| Offline (extra §7.3) | Implementado en **Flutter** (Drift + outbox), independiente del BaaS |
+
+**Argumentos de defensa (memorizar en tus palabras):**
+
+1. **El enunciado no prohíbe Supabase.** En §3.2 dice literalmente usar el mecanismo nativo de **“Supabase o Appwrite”** para el enlace de restablecimiento. Elegimos Supabase Auth, que cumple el mismo contrato funcional.
+
+2. **RLS en PostgreSQL** modela mejor la jerarquía electoral (provincial → recinto → mesa → acta) que permisos genéricos de documentos. Las políticas SQL son auditables y se prueban en migraciones (`0002_rls.sql`).
+
+3. **Consultas analíticas del provincial** (votos consolidados, mesas con/sin acta, GPS por acta) son más simples en SQL relacional que en una BD orientada a documentos.
+
+4. **Sobre el límite de transacciones:** para una demo académica con pocos usuarios de prueba, el plan gratuito de Supabase es suficiente. La carga real del día electoral la absorbe la **persistencia local offline** del veedor; la sync es por lotes al reconectar, no transacción por transacción en tiempo real.
+
+5. **Appwrite vs Supabase no cambia la arquitectura Flutter.** Presentation → Domain → Data permanece igual; solo cambia el datasource remoto. La decisión es de **backend**, no de diseño de la app móvil.
+
+**Frase corta para cerrar:** *“Usamos Supabase porque el dominio es relacional y jerárquico; RLS nos da seguridad por rol en SQL, Auth cubre confirmación y reset como pide el documento, y el offline lo resolvimos en el cliente con Drift.”*
+
+---
+
+### 7.2 ¿Por qué Clean Architecture?
+
+**Qué dice el documento:** §5.2 exige *“Separación clara entre capas: presentación, lógica de negocio y acceso a datos”* y que el estudiante **explique esa separación** en sustentación (6 pts en funcionalidad + parte de sustentación).
+
+**Cómo está organizado el proyecto:**
+
+| Capa | Responsabilidad | Ejemplos en el repo |
+|------|-----------------|---------------------|
+| **Presentation** | UI, BLoC, navegación | `login_page.dart`, `AuthBloc`, `ActaDetailPage` |
+| **Domain** | Reglas de negocio puras, sin Flutter ni Supabase | `SaveActa`, `CedulaValidator`, entidades, interfaces de repositorio |
+| **Data** | Fuentes concretas (Supabase, Drift, Storage) | `AuthRemoteDataSource`, `ActasRepositoryImpl`, `SyncService` |
+
+**Use case como frontera de negocio** — la UI no valida votos directamente; delega al dominio:
+
+```14:20:lib/features/actas/domain/usecases/save_acta.dart
+  Future<Either<Failure, ActaEntity>> call(ActaEntity acta) async {
+    final error = validateVotos(acta);
+    if (error != null) {
+      return Left(ValidationFailure(error));
+    }
+    return repository.saveActa(acta);
+  }
+```
+
+**Contrato genérico de casos de uso** (patrón reutilizable en todos los features):
+
+```4:6:lib/core/usecase/usecase.dart
+abstract class UseCase<Type, Params> {
+  Future<Either<Failure, Type>> call(Params params);
+}
+```
+
+**Por qué elegimos Clean Architecture:**
+
+- **Testabilidad:** `SaveActa.validateVotos` y `CedulaValidator` son Dart puro; se pueden probar sin emulador ni red.
+- **Independencia del backend:** si mañana migráramos a Appwrite, cambiaríamos `data/` y migraciones, no las reglas de actas ni la UI.
+- **Cumplimiento explícito del PDF:** tres carpetas por feature (`domain`, `data`, `presentation`) demuestran la separación que pide §5.2.
+- **Errores tipados:** `Either<Failure, T>` (paquete `dartz`) obliga a manejar fallo/éxito en BLoC, evitando pantallas en blanco.
+
+**Flujo para explicar en viva voz:** *“La pantalla dispara un evento al BLoC → el BLoC llama un UseCase → el UseCase aplica reglas y llama al Repository → el Repository decide Drift local o Supabase remoto.”*
+
+---
+
+### 7.3 ¿Por qué BLoC como gestor de estado?
+
+**Qué dice el documento:** §5.2 permite BLoC, Riverpod, Provider u otro, pero exige **justificar la elección** y representar **explícitamente** estados de carga, éxito y error en la UI (sin pantallas en blanco).
+
+**Por qué BLoC y no Provider/Riverpod:**
+
+| Ventaja de BLoC | Aplicación en Control Electoral |
+|-----------------|----------------------------------|
+| **Eventos → Estados** explícitos | `SignInRequested` → `AuthLoading` → `AuthAuthenticated` / `AuthError` |
+| **Estados inmutables y tipados** | Clases `Equatable` fáciles de comparar en `BlocBuilder` |
+| **Separación UI / lógica** | La página solo hace `context.read<AuthBloc>().add(...)` |
+| **Ecosistema maduro** | `flutter_bloc` + documentación oficial Flutter |
+| **Encaja con Clean Architecture** | BLoC vive solo en `presentation/`; llama use cases, no Supabase directo |
+
+**Estados explícitos de auth** (carga, éxito, error, cambio de clave obligatorio):
+
+```10:47:lib/features/auth/presentation/bloc/auth_state.dart
+class AuthInitial extends AuthState {
+  const AuthInitial();
+}
+
+class AuthLoading extends AuthState {
+  const AuthLoading();
+}
+
+class AuthAuthenticated extends AuthState {
+  final SessionEntity session;
+  const AuthAuthenticated(this.session);
+  // ...
+}
+
+class AuthMustChangePassword extends AuthState {
+  final SessionEntity session;
+  const AuthMustChangePassword(this.session);
+  // ...
+}
+
+class AuthError extends AuthState {
+  final String message;
+  const AuthError(this.message);
+  // ...
+}
+
+class ResetPasswordSent extends AuthState {
+  const ResetPasswordSent();
+}
+```
+
+**Estados explícitos al guardar acta** (cumple retroalimentación visual del documento):
+
+```39:65:lib/features/actas/presentation/bloc/actas_bloc.dart
+class ActasLoading extends ActasState {
+  const ActasLoading();
+}
+
+class ActasLoaded extends ActasState {
+  final String mesaId;
+  final ActaEntity? alcalde;
+  final ActaEntity? prefecto;
+  // ...
+}
+
+class ActasError extends ActasState {
+  final String message;
+  const ActasError(this.message);
+  // ...
+}
+
+class ActaSaving extends ActasState {
+  const ActaSaving();
+}
+
+class ActaSaveSuccess extends ActasState {
+  const ActaSaveSuccess();
+}
+```
+
+**Ejemplo de emisión secuencial** (login con feedback):
+
+```54:62:lib/features/auth/presentation/bloc/auth_bloc.dart
+  Future<void> _onSignIn(SignInRequested e, Emitter<AuthState> emit) async {
+    emit(const AuthLoading());
+    final result = await signIn(
+      SignInParams(cedula: e.cedula, password: e.password),
+    );
+    result.fold(
+      (failure) => emit(AuthError(failure.message)),
+      (session) => emit(_resolve(session)),
+    );
+  }
+```
+
+**Frase para la defensa:** *“Elegí BLoC porque cada operación tiene estados discretos que la UI puede pintar: spinner en Loading, diálogo en Error, navegación en Authenticated. Eso es exactamente lo que pide la rúbrica de retroalimentación visual.”*
+
+---
+
+### 7.4 Flujo de correos electrónicos (Gmail SMTP)
+
+**Qué dice el documento:**
+
+- §3.1: al crear veedor o coordinador debe **llegar un correo de confirmación**.
+- §3.2: recuperación de contraseña **mediante correo**, con mecanismo nativo de Supabase o Appwrite.
+
+**Componentes del sistema de correo:**
+
+```
+┌─────────────┐     create-user / resetPasswordForEmail      ┌──────────────┐
+│  App Flutter │ ───────────────────────────────────────────► │ Supabase Auth │
+└─────────────┘                                                └──────┬───────┘
+                                                                      │
+                                      Gmail SMTP (Dashboard Supabase) │
+                                                                      ▼
+                                                               ┌─────────────┐
+                                                               │ Bandeja del │
+                                                               │   usuario   │
+                                                               └──────┬──────┘
+                                                                      │ clic en enlace
+                                                                      ▼
+                                                               ┌─────────────┐
+                                                               │   Vercel    │
+                                                               │ verify-email│
+                                                               │ reset-pass  │
+                                                               └──────┬──────┘
+                                                                      │ verifyOtp / updateUser
+                                                                      ▼
+                                                               ┌──────────────┐
+                                                               │ Supabase Auth│
+                                                               │ (cuenta OK)  │
+                                                               └──────────────┘
+```
+
+**Configuración Gmail SMTP (Supabase Dashboard):**
+
+En **Authentication → SMTP Settings** se configuró Gmail como servidor de salida (típicamente `smtp.gmail.com`, puerto **587**, TLS, con **contraseña de aplicación** de Google — no la clave normal de la cuenta). Supabase Auth usa ese SMTP para todos los correos transaccionales: confirmación de registro y recuperación de contraseña.
+
+**Importante:** La app Flutter **no envía correos directamente**. Solo invoca APIs de Supabase; el envío físico lo hace Auth + SMTP.
+
+---
+
+#### A) Confirmación de cuenta al crear usuario (§3.1)
+
+**Paso 1 — App:** coordinador provincial/recinto completa el formulario → llama Edge Function `create-user`.
+
+**Paso 2 — Servidor:** crea usuario sin confirmar y dispara el correo:
+
+```170:191:supabase/functions/create-user/index.ts
+  const { data: created, error: createErr } = await admin.auth.admin.createUser({
+    email,
+    password: INITIAL_PASSWORD,
+    email_confirm: false,
+    user_metadata: { display_name: `${nombres} ${apellidos}` },
+  });
+  // ...
+  const { error: resendErr } = await admin.auth.resend({
+    type: "signup",
+    email,
+    options: {
+      emailRedirectTo: "https://loginfluttervercel.vercel.app/verify-email",
+    },
+  });
+```
+
+**Paso 3 — Supabase + Gmail:** envía email con plantilla *Confirm signup*. El enlace incluye `token_hash` y redirige a Vercel (`/verify-email`).
+
+**Paso 4 — Página Vercel:** valida el token con el SDK de Supabase:
+
+```159:163:vercel/public/verify-email.html
+                const { data, error } = await supabase.auth.verifyOtp({
+                    token_hash: tokenHash,
+                    type: 'signup',
+                });
+```
+
+**Paso 5 — Usuario:** ve “Email verificado” → puede hacer login en la app con cédula + `Ecuador2026` → sistema fuerza cambio de contraseña (`must_change_password`).
+
+**Si intenta login sin confirmar:** la app muestra mensaje específico (no “contraseña incorrecta”):
+
+```130:134:lib/features/auth/data/datasources/auth_remote_data_source.dart
+    if (_isEmailNotConfirmed(lower, codeLower)) {
+      return 'Debes confirmar tu correo electrónico antes de ingresar. '
+          'Revisa tu bandeja de entrada (y spam) y haz clic en el enlace '
+          'de verificación.';
+    }
+```
+
+---
+
+#### B) Recuperación de contraseña (§3.2)
+
+**Paso 1 — App:** pantalla “Olvidé mi contraseña” → usuario ingresa **email** registrado.
+
+**Paso 2 — Flutter:** llama mecanismo nativo Supabase con redirect a Vercel:
+
+```78:84:lib/features/auth/data/datasources/auth_remote_data_source.dart
+  Future<void> sendPasswordResetEmail({required String email}) async {
+    try {
+      await supabaseClient.auth.resetPasswordForEmail(
+        email,
+        redirectTo:
+            '${AppConstants.vercelBaseUrl}${AppConstants.resetPasswordPath}',
+      );
+```
+
+**Paso 3 — Supabase + Gmail:** envía correo *Reset password* con enlace a `/reset-password?token_hash=...&type=recovery`.
+
+**Paso 4 — Página Vercel:** verifica OTP de recuperación y muestra formulario de nueva clave:
+
+```525:530:vercel/public/reset-password.html
+          if (token && type === "recovery") {
+            const { data, error } = await supabase.auth.verifyOtp({
+              token_hash: token,
+              type: "recovery",
+            });
+```
+
+**Paso 5 — Usuario:** escribe nueva contraseña → `supabase.auth.updateUser({ password })` → mensaje de éxito → puede iniciar sesión en la app.
+
+**¿Por qué Vercel además de Supabase?** Los enlaces de correo deben abrirse en **navegador** (móvil o PC). Supabase redirige a una URL HTTPS; nuestras páginas estáticas en Vercel completan la verificación con JavaScript y muestran UX clara (loading / éxito / error), cumpliendo la retroalimentación visual del documento.
+
+**Variables necesarias:** `.env` de Flutter (`VERCEL_BASE_URL`) y variables en Vercel (`SUPABASE_URL`, `SUPABASE_ANON_KEY`) expuestas de forma segura vía `/api/config`:
+
+```14:17:vercel/api/config.js
+  res.status(200).json({
+    supabaseUrl: process.env.SUPABASE_URL,
+    supabaseAnonKey: process.env.SUPABASE_ANON_KEY,
+  });
+```
+
+**Redirect URLs en Supabase:** en **Authentication → URL Configuration** deben estar registradas `https://tu-dominio.vercel.app/verify-email` y `/reset-password`.
+
+---
+
+## 8. Limitaciones conocidas (útil mencionar en defensa)
+
+1. **Supabase vs Appwrite:** ver justificación completa en §7.1; el documento acepta Supabase Auth para reset de contraseña.
+2. **Desasignación offline:** si un veedor pierde la mesa mientras está offline, al sincronizar **RLS rechaza** el push; los datos quedan en local hasta resolverse manualmente.
+3. **Last-write-wins:** no hay merge de campos; gana la versión con `updated_at` más reciente.
+4. **Storage:** políticas del bucket permiten upload autenticado; el control fino está en la tabla `actas`.
+
+---
+
+## 9. Preguntas de práctica (20)
+
+Responde por escrito o en voz alta antes de la sustentación. Al final del documento (§10) hay una **guía breve de respuestas** para autoevaluarte.
+
+1. ¿Cuáles son los tres roles de la aplicación y qué puede hacer cada uno?
+
+2. ¿Por qué el login pide cédula si Supabase Auth usa email y contraseña?
+
+3. Explica el algoritmo de validación de cédula ecuatoriana (módulo 10) en tus propias palabras.
+
+4. ¿Qué ocurre cuando un usuario creado desde la app intenta ingresar por primera vez?
+
+5. ¿Dónde se decide qué pantalla principal ve cada usuario después del login?
+
+6. ¿Qué validaciones debe cumplir un acta antes de guardarse?
+
+7. ¿Cómo funciona la detección de foto borrosa y por qué es importante?
+
+8. ¿Qué pasa si el veedor no concede permiso de ubicación?
+
+9. Describe el flujo **offline-first** desde que el veedor guarda un acta hasta que llega a Supabase.
+
+10. ¿Qué es el patrón Outbox y qué tablas locales lo implementan?
+
+11. ¿Cómo se resuelve un conflicto si la misma acta fue modificada localmente y en el servidor?
+
+12. ¿Qué es RLS y cómo impide que un veedor modifique actas de otra mesa?
+
+13. ¿Quién puede crear usuarios y qué restricciones tiene la Edge Function `create-user`?
+
+14. ¿Cómo se crean las mesas (JRV) al registrar un nuevo recinto?
+
+15. Si el documento pide Appwrite y el proyecto usa Supabase, ¿cómo justificarías esa elección en la sustentación?
+
+16. ¿Cuáles son las tres capas de Clean Architecture en este proyecto y qué archivo representa cada una?
+
+17. ¿Por qué elegiste BLoC y cómo se ve un estado de carga y un estado de error en la UI?
+
+18. ¿Quién envía físicamente el correo de confirmación: la app Flutter, Vercel o Supabase?
+
+19. Describe paso a paso qué ocurre desde que el provincial crea un veedor hasta que ese veedor puede iniciar sesión.
+
+20. ¿Para qué sirven las páginas `verify-email.html` y `reset-password.html` en Vercel?
+
+---
+
+## 10. Guía breve de respuestas (autoevaluación)
+
+<details>
+<summary>Mostrar respuestas modelo</summary>
+
+1. **Roles:** Provincial (recintos, coordinadores, avance global); Recinto (veedores, mesas, su recinto); Veedor (actas de sus mesas con foto/GPS/votos).
+
+2. **Cédula vs email:** UX ecuatoriana; RPC `get_email_by_cedula` resuelve el email internamente; Auth sigue siendo email+password.
+
+3. **Módulo 10:** 10 dígitos, provincia 01–24, posiciones impares×2 (restar 9 si >9), pares suman directo, dígito verificador = decena superior − total (mod 10).
+
+4. **Primer ingreso:** Debe confirmar correo; contraseña inicial `Ecuador2026`; `must_change_password` fuerza cambio antes del home.
+
+5. **`_RootGate` en `main.dart`:** `BlocBuilder<AuthBloc>` + `switch (profile.role)`.
+
+6. **Validaciones acta:** Sufragantes > 0; votos no negativos; suma = sufragantes; foto; GPS.
+
+7. **Blur:** `BlurDetector` calcula varianza Laplaciana y ratio de bordes; rechaza fotos borrosas del acta.
+
+8. **Sin GPS:** `LocationPermissionException`; la UI no permite guardar el acta.
+
+9. **Offline:** `saveActa` → `enqueueActa` → Drift + outbox → al volver red `processOutbox` → `pushActa` + Storage foto.
+
+10. **Outbox:** Cola FIFO de operaciones pendientes; tablas Drift `actas_local` y `outbox`.
+
+11. **Conflicto:** Last-write-wins por `updated_at`; si remoto es más nuevo, descarta local y elimina de outbox.
+
+12. **RLS:** Políticas Postgres por rol; veedor solo INSERT/UPDATE donde `mesas.veedor_id = auth.uid()`.
+
+13. **create-user:** Provincial → coordinadores; Recinto → veedores de su recinto; valida cédula; service role para crear auth.
+
+14. **Mesas:** `List.generate` en `createRecinto` inserta filas `{ recinto_id, numero_jrv: i+1 }`.
+
+15. **Supabase vs Appwrite:** §3.2 acepta Supabase; RLS en Postgres para roles; modelo relacional; offline en cliente; plan free suficiente para demo académica.
+
+16. **Capas:** Presentation (`AuthBloc`, páginas); Domain (`SaveActa`, entidades); Data (`AuthRemoteDataSource`, repos, Drift).
+
+17. **BLoC:** Eventos/estados explícitos; `AuthLoading` muestra spinner; `AuthError` abre diálogo; `ActaSaving` deshabilita botón guardar.
+
+18. **Correo:** Supabase Auth vía **Gmail SMTP** configurado en el dashboard; Flutter solo invoca `resend` o `resetPasswordForEmail`.
+
+19. **Crear veedor:** Formulario app → `create-user` → `createUser` + `resend signup` → correo Gmail → usuario confirma en Vercel → login cédula → cambio clave obligatorio → home veedor.
+
+20. **Vercel:** Landing HTTPS que recibe el enlace del correo, ejecuta `verifyOtp` o `updateUser` con el SDK JS, y muestra éxito/error al usuario.
+
+</details>
+
+---
+
+*Generado para sustentación académica del proyecto Control Electoral.*
