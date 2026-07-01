@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/app_decorations.dart';
-import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/app_logo.dart';
 import '../../../../core/widgets/primary_button.dart';
 import '../../../../core/widgets/screen_entrance.dart';
 import '../../../../core/widgets/user_message_dialog.dart';
@@ -73,20 +73,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
                   child: Column(
                     children: [
-                      Container(
-                        width: 80,
-                        height: 80,
-                        decoration: BoxDecoration(
-                          color: AppTheme.primaryColor,
-                          borderRadius: BorderRadius.circular(22),
-                          boxShadow: AppDecorations.softShadow,
-                        ),
-                        child: const Icon(
-                          Icons.password_rounded,
-                          color: Colors.white,
-                          size: 38,
-                        ),
-                      ).fadeSlideUp(),
+                      const AppLogo(size: 96).fadeSlideUp(),
                       const SizedBox(height: 24),
                       Text(
                         widget.mandatory

@@ -126,16 +126,27 @@ String authErrorTitle(String message) {
       lower.contains('no existe')) {
     return 'Cédula no registrada';
   }
+  if (lower.contains('confirmar tu correo') ||
+      lower.contains('correo electrónico antes') ||
+      (lower.contains('correo') && lower.contains('confirm'))) {
+    return 'Correo sin confirmar';
+  }
   if (lower.contains('contrasena incorrecta') ||
       lower.contains('contraseña incorrecta') ||
       lower.contains('credenciales')) {
     return 'Contraseña incorrecta';
   }
-  if (lower.contains('conexion') || lower.contains('internet')) {
+  if (lower.contains('conexion') || lower.contains('conexión') ||
+      lower.contains('internet')) {
     return 'Sin conexión';
   }
-  if (lower.contains('correo') && lower.contains('confirm')) {
-    return 'Correo sin confirmar';
-  }
   return 'No se pudo completar';
+}
+
+/// Indica si el error de login es por correo aun no verificado.
+bool authErrorIsUnconfirmedEmail(String message) {
+  final lower = message.toLowerCase();
+  return lower.contains('confirmar tu correo') ||
+      lower.contains('correo electrónico antes') ||
+      (lower.contains('correo') && lower.contains('confirm'));
 }

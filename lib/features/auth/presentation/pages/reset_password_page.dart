@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/app_decorations.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/app_logo.dart';
 import '../../../../core/widgets/primary_button.dart';
 import '../../../../core/widgets/screen_entrance.dart';
 import '../../../../core/widgets/soft_card.dart';
@@ -78,19 +79,9 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                         ),
                       ).fadeSlideUp(),
                       const SizedBox(height: 8),
-                      Container(
-                        width: 80,
-                        height: 80,
-                        decoration: BoxDecoration(
-                          color: AppTheme.secondaryColor.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(22),
-                        ),
-                        child: const Icon(
-                          Icons.lock_reset_rounded,
-                          size: 40,
-                          color: AppTheme.primaryColor,
-                        ),
-                      ).fadeSlideUp(delay: const Duration(milliseconds: 80)),
+                      const AppLogo(size: 96).fadeSlideUp(
+                        delay: const Duration(milliseconds: 80),
+                      ),
                       const SizedBox(height: 24),
                       Text(
                         'Recuperar contraseña',

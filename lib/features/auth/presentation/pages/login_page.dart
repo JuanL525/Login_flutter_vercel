@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../core/constants/app_branding.dart';
 import '../../../../core/theme/app_decorations.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/app_logo.dart';
 import '../../../../core/widgets/primary_button.dart';
 import '../../../../core/widgets/screen_entrance.dart';
 import '../../../../core/widgets/soft_card.dart';
@@ -57,23 +59,10 @@ class _LoginPageState extends State<LoginPage> {
                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
                   child: Column(
                     children: [
-                      Container(
-                        width: 88,
-                        height: 88,
-                        decoration: BoxDecoration(
-                          color: AppTheme.primaryColor,
-                          borderRadius: BorderRadius.circular(24),
-                          boxShadow: AppDecorations.softShadow,
-                        ),
-                        child: const Icon(
-                          Icons.how_to_vote_rounded,
-                          size: 44,
-                          color: Colors.white,
-                        ),
-                      ).fadeSlideUp(),
+                      const AppLogo(size: 112).fadeSlideUp(),
                       const SizedBox(height: 24),
                       Text(
-                        'Control Electoral',
+                        AppBranding.appName,
                         style: Theme.of(context).textTheme.displayMedium,
                         textAlign: TextAlign.center,
                       ).fadeSlideUp(delay: const Duration(milliseconds: 80)),

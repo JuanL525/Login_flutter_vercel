@@ -59,10 +59,16 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         }
         return _fetchProfile(response.user!.id);
       } on AuthException catch (e) {
-        throw Exception(_mapAuthError(e.message, passwordAttempt: true));
+        throw Exception(
+          _mapAuthError(
+            e.message,
+            passwordAttempt: true,
+            code: e.code,
+          ),
+        );
       }
     } on AuthException catch (e) {
-      throw Exception(_mapAuthError(e.message));
+      throw Exception(_mapAuthError(e.message, code: e.code));
     } catch (e) {
       rethrow;
     }
@@ -113,16 +119,25 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     return _fetchProfile(user.id);
   }
 
-  String _mapAuthError(String message, {bool passwordAttempt = false}) {
+  String _mapAuthError(
+    String message, {
+    bool passwordAttempt = false,
+    String? code,
+  }) {
     final lower = message.toLowerCase();
+    final codeLower = code?.toLowerCase() ?? '';
+
+    if (_isEmailNotConfirmed(lower, codeLower)) {
+      return 'Debes confirmar tu correo electrónico antes de ingresar. '
+          'Revisa tu bandeja de entrada (y spam) y haz clic en el enlace '
+          'de verificación.';
+    }
+
     if (passwordAttempt ||
         lower.contains('invalid login') ||
         lower.contains('invalid credentials')) {
       return 'Contraseña incorrecta. Si es tu primer ingreso, '
           'recuerda que la clave inicial es Ecuador2026.';
-    }
-    if (lower.contains('email not confirmed')) {
-      return 'Debes confirmar tu correo electrónico antes de ingresar.';
     }
     if (lower.contains('rate limit') || lower.contains('too many requests')) {
       return 'Demasiados intentos. Espera un momento e intenta de nuevo.';
@@ -131,5 +146,15 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       return 'No existe una cuenta registrada con esos datos.';
     }
     return message;
+  }
+
+  bool _isEmailNotConfirmed(String lowerMessage, String lowerCode) {
+    if (lowerCode == 'email_not_confirmed') return true;
+    if (lowerMessage.contains('email not confirmed')) return true;
+    if (lowerMessage.contains('email address not confirmed')) return true;
+    return lowerMessage.contains('correo') &&
+        (lowerMessage.contains('no confirm') ||
+            lowerMessage.contains('sin confirm') ||
+            lowerMessage.contains('not confirm'));
   }
 }

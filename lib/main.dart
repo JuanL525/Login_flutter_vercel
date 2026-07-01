@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'core/constants/enums.dart';
+import 'core/constants/app_branding.dart';
 import 'core/theme/app_theme.dart';
+import 'core/widgets/app_logo.dart';
 import 'core/widgets/primary_button.dart';
 import 'core/widgets/screen_entrance.dart';
 import 'core/widgets/user_message_dialog.dart';
@@ -32,7 +34,7 @@ class MyApp extends StatelessWidget {
     return BlocProvider(
       create: (_) => getIt<AuthBloc>()..add(const AuthCheckRequested()),
       child: MaterialApp(
-        title: 'Control Electoral',
+        title: AppBranding.appName,
         debugShowCheckedModeBanner: false,
         theme: AppTheme.lightTheme,
         builder: (context, child) {
@@ -57,11 +59,20 @@ class _AuthShell extends StatelessWidget {
       listenWhen: (previous, current) => current is AuthError,
       listener: (context, state) async {
         if (state is! AuthError) return;
-        await UserMessageDialog.showError(
-          context,
-          title: authErrorTitle(state.message),
-          message: state.message,
-        );
+        final title = authErrorTitle(state.message);
+        if (authErrorIsUnconfirmedEmail(state.message)) {
+          await UserMessageDialog.showWarning(
+            context,
+            title: title,
+            message: state.message,
+          );
+        } else {
+          await UserMessageDialog.showError(
+            context,
+            title: title,
+            message: state.message,
+          );
+        }
         if (context.mounted) {
           context.read<AuthBloc>().add(const AuthErrorDismissed());
         }
@@ -131,19 +142,7 @@ class _SinRecintoPage extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Container(
-                width: 88,
-                height: 88,
-                decoration: BoxDecoration(
-                  color: AppTheme.accentColor.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                child: const Icon(
-                  Icons.location_off_outlined,
-                  size: 44,
-                  color: AppTheme.accentColor,
-                ),
-              ).fadeSlideUp(),
+              const AppLogo(size: 96).fadeSlideUp(),
               const SizedBox(height: 24),
               Text(
                 'Sin recinto asignado',
