@@ -2,6 +2,7 @@ import 'package:dartz/dartz.dart';
 import 'package:injectable/injectable.dart';
 import '../../../../core/constants/enums.dart';
 import '../../../../core/error/failures.dart';
+import '../../../../core/utils/user_error_message.dart';
 import '../../../../core/network/network_info.dart';
 import '../../domain/entities/profile_entity.dart';
 import '../../domain/repositories/users_repository.dart';
@@ -87,6 +88,5 @@ class UsersRepositoryImpl implements UsersRepository {
     }
   }
 
-  String _clean(Object e) =>
-      e.toString().replaceFirst('Exception: ', '').trim();
+  String _clean(Object e) => humanizeError(e);
 }

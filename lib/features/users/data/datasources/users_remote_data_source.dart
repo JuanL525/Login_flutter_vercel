@@ -1,6 +1,7 @@
 import 'package:injectable/injectable.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/constants/enums.dart';
+import '../../../../core/utils/user_error_message.dart';
 import '../models/profile_model.dart';
 
 abstract class UsersRemoteDataSource {
@@ -42,25 +43,21 @@ class UsersRemoteDataSourceImpl implements UsersRemoteDataSource {
     required UserRole role,
     String? recintoId,
   }) async {
-    final response = await supabaseClient.functions.invoke(
-      'create-user',
-      body: {
-        'cedula': cedula,
-        'nombres': nombres,
-        'apellidos': apellidos,
-        'telefono': telefono,
-        'email': email,
-        'role': role.dbValue,
-        if (recintoId != null) 'recinto_id': recintoId,
-      },
-    );
-
-    if (response.status >= 400) {
-      final data = response.data;
-      final message = (data is Map && data['error'] != null)
-          ? data['error'].toString()
-          : 'No se pudo crear el usuario (codigo ${response.status})';
-      throw Exception(message);
+    try {
+      await supabaseClient.functions.invoke(
+        'create-user',
+        body: {
+          'cedula': cedula,
+          'nombres': nombres,
+          'apellidos': apellidos,
+          'telefono': telefono,
+          'email': email,
+          'role': role.dbValue,
+          if (recintoId != null) 'recinto_id': recintoId,
+        },
+      );
+    } on FunctionException catch (e) {
+      throw Exception(humanizeError(e));
     }
   }
 

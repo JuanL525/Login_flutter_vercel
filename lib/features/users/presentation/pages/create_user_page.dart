@@ -6,6 +6,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/validators/cedula_validator.dart';
 import '../../../../core/widgets/primary_button.dart';
 import '../../../../core/widgets/soft_card.dart';
+import '../../../../core/utils/user_error_message.dart';
 import '../../../../core/widgets/user_message_dialog.dart';
 import '../../../../injection_container.dart';
 import '../../../auth/presentation/widgets/custom_text_field.dart';
@@ -91,7 +92,7 @@ class _CreateUserViewState extends State<_CreateUserView> {
           if (state is UsersError) {
             await UserMessageDialog.showError(
               context,
-              title: 'No se pudo crear la cuenta',
+              title: createUserErrorTitle(state.message),
               message: state.message,
             );
           } else if (state is UserCreatedSuccess) {
