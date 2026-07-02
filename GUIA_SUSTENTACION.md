@@ -8,11 +8,13 @@ Documento de apoyo para la defensa de la **Prueba 2: Desarrollo de Apps**. Resum
 
 **Control Electoral** es una app móvil Flutter para el escrutinio electoral con tres roles jerárquicos:
 
-| Rol | Responsabilidad principal |
-|-----|---------------------------|
-| **Coordinador provincial** | Crea recintos, asigna coordinadores, ve avance global |
-| **Coordinador de recinto** | Crea veedores, asigna mesas, supervisa su recinto |
-| **Veedor de mesa** | Registra actas (alcalde/prefecto) con foto, GPS y votos |
+
+| Rol                        | Responsabilidad principal                               |
+| -------------------------- | ------------------------------------------------------- |
+| **Coordinador provincial** | Crea recintos, asigna coordinadores, ve avance global   |
+| **Coordinador de recinto** | Crea veedores, asigna mesas, supervisa su recinto       |
+| **Veedor de mesa**         | Registra actas (alcalde/prefecto) con foto, GPS y votos |
+
 
 **Stack técnico:** Flutter 3.6+, **Supabase** (Auth, Postgres, Storage, Edge Functions), **Vercel** (páginas de verificación y reset de contraseña), **Drift** (SQLite local), patrón **Clean Architecture** + **BLoC**.
 
@@ -22,22 +24,24 @@ Documento de apoyo para la defensa de la **Prueba 2: Desarrollo de Apps**. Resum
 
 ## 2. Mapa de requisitos → implementación
 
-| Requisito (documento) | Dónde se implementa (archivo) |
-|----------------------|-------------------------------|
-| Login con cédula ecuatoriana | `lib/core/validators/cedula_validator.dart` + RPC `get_email_by_cedula` + `lib/features/auth/data/datasources/auth_remote_data_source.dart` |
-| Tres roles con pantallas distintas | `_RootGate` en `lib/main.dart` |
-| Creación jerárquica de usuarios | Edge Function `supabase/functions/create-user/index.ts` |
-| Recintos y mesas (JRV) | `lib/features/recintos/data/datasources/recintos_remote_data_source.dart` |
-| Actas con foto obligatoria | `lib/core/services/photo_capture_service.dart` + `lib/core/services/blur_detector.dart` |
-| GPS obligatorio | `lib/core/services/gps_service.dart` |
-| Validación votos = sufragantes | `SaveActa.validateVotos` en `lib/features/actas/domain/usecases/save_acta.dart` |
-| Modo offline | Drift (`lib/core/db/app_database.dart`) + `lib/features/sync/data/sync_service.dart` (outbox) |
-| Seguridad por rol | RLS en `supabase/migrations/0002_rls.sql` |
-| Cambio obligatorio de contraseña | `must_change_password` + `AuthBloc._resolve` en `lib/features/auth/presentation/bloc/auth_bloc.dart` |
-| Verificación de correo | Supabase Auth + Gmail SMTP + `vercel/public/verify-email.html` |
-| Recuperación de contraseña | `sendPasswordResetEmail()` en `auth_remote_data_source.dart` + `vercel/public/reset-password.html` |
-| Separación de capas (§5.2) | Clean Architecture: `domain/` → `data/` → `presentation/` en cada feature |
-| Gestor de estado (§5.2) | BLoC (`*_bloc.dart`, `*_state.dart`) con estados `Loading` / `Error` / `Success` explícitos |
+
+| Requisito (documento)              | Dónde se implementa (archivo)                                                                                                               |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| Login con cédula ecuatoriana       | `lib/core/validators/cedula_validator.dart` + RPC `get_email_by_cedula` + `lib/features/auth/data/datasources/auth_remote_data_source.dart` |
+| Tres roles con pantallas distintas | `_RootGate` en `lib/main.dart`                                                                                                              |
+| Creación jerárquica de usuarios    | Edge Function `supabase/functions/create-user/index.ts`                                                                                     |
+| Recintos y mesas (JRV)             | `lib/features/recintos/data/datasources/recintos_remote_data_source.dart`                                                                   |
+| Actas con foto obligatoria         | `lib/core/services/photo_capture_service.dart` + `lib/core/services/blur_detector.dart`                                                     |
+| GPS obligatorio                    | `lib/core/services/gps_service.dart`                                                                                                        |
+| Validación votos = sufragantes     | `SaveActa.validateVotos` en `lib/features/actas/domain/usecases/save_acta.dart`                                                             |
+| Modo offline                       | Drift (`lib/core/db/app_database.dart`) + `lib/features/sync/data/sync_service.dart` (outbox)                                               |
+| Seguridad por rol                  | RLS en `supabase/migrations/0002_rls.sql`                                                                                                   |
+| Cambio obligatorio de contraseña   | `must_change_password` + `AuthBloc._resolve` en `lib/features/auth/presentation/bloc/auth_bloc.dart`                                        |
+| Verificación de correo             | Supabase Auth + Gmail SMTP + `vercel/public/verify-email.html`                                                                              |
+| Recuperación de contraseña         | `sendPasswordResetEmail()` en `auth_remote_data_source.dart` + `vercel/public/reset-password.html`                                          |
+| Separación de capas (§5.2)         | Clean Architecture: `domain/` → `data/` → `presentation/` en cada feature                                                                   |
+| Gestor de estado (§5.2)            | BLoC (`*_bloc.dart`, `*_state.dart`) con estados `Loading` / `Error` / `Success` explícitos                                                 |
+
 
 ---
 
@@ -57,14 +61,16 @@ lib/
 
 **Flujo típico (veedor guarda acta):**
 
-| Paso | Archivo |
-|------|---------|
-| UI | `lib/features/actas/presentation/pages/acta_detail_page.dart` |
-| BLoC | `lib/features/actas/presentation/bloc/actas_bloc.dart` |
-| Use case | `lib/features/actas/domain/usecases/save_acta.dart` |
-| Repositorio | `lib/features/actas/data/repositories/actas_repository_impl.dart` |
-| Sync offline | `lib/features/sync/data/sync_service.dart` |
-| BD local | `lib/core/db/app_database.dart` (Drift) |
+
+| Paso         | Archivo                                                           |
+| ------------ | ----------------------------------------------------------------- |
+| UI           | `lib/features/actas/presentation/pages/acta_detail_page.dart`     |
+| BLoC         | `lib/features/actas/presentation/bloc/actas_bloc.dart`            |
+| Use case     | `lib/features/actas/domain/usecases/save_acta.dart`               |
+| Repositorio  | `lib/features/actas/data/repositories/actas_repository_impl.dart` |
+| Sync offline | `lib/features/sync/data/sync_service.dart`                        |
+| BD local     | `lib/core/db/app_database.dart` (Drift)                           |
+
 
 ```
 UI (ActaDetailPage)
@@ -230,12 +236,14 @@ Implementada en **Dart puro** (capa domain/core), reutilizada en formularios y r
 
 Una **Edge Function** es código **serverless** que corre en los servidores de Supabase (runtime **Deno/TypeScript**), no dentro de la app Flutter. Es un mini-backend invocable por HTTP: la app le envía datos y la función responde con JSON.
 
-| Concepto | En Control Electoral |
-|----------|---------------------|
-| **Dónde vive** | `supabase/functions/create-user/index.ts` |
-| **Cómo se despliega** | Supabase CLI o Dashboard (`supabase functions deploy create-user`) |
-| **Cómo la llama la app** | `supabaseClient.functions.invoke('create-user', ...)` |
-| **Cuándo se ejecuta** | Al crear un coordinador (provincial) o un veedor (recinto) |
+
+| Concepto                 | En Control Electoral                                               |
+| ------------------------ | ------------------------------------------------------------------ |
+| **Dónde vive**           | `supabase/functions/create-user/index.ts`                          |
+| **Cómo se despliega**    | Supabase CLI o Dashboard (`supabase functions deploy create-user`) |
+| **Cómo la llama la app** | `supabaseClient.functions.invoke('create-user', ...)`              |
+| **Cuándo se ejecuta**    | Al crear un coordinador (provincial) o un veedor (recinto)         |
+
 
 **Flujo en nuestra app:**
 
@@ -266,7 +274,7 @@ CreateUserPage (Flutter)
 
 #### ¿Por qué la necesitamos? (no basta con Flutter + RLS)
 
-El documento exige que **solo el provincial cree coordinadores** y **solo el recinto cree veedores** (§3.1). Crear usuarios en Supabase Auth requiere la clave **`service_role`**, que tiene permisos de administrador. Esa clave **nunca puede ir en la app móvil** (cualquiera la extraería del APK).
+El documento exige que **solo el provincial cree coordinadores** y **solo el recinto cree veedores** (§3.1). Crear usuarios en Supabase Auth requiere la clave `**service_role`**, que tiene permisos de administrador. Esa clave **nunca puede ir en la app móvil** (cualquiera la extraería del APK).
 
 La Edge Function resuelve eso:
 
@@ -405,7 +413,95 @@ Operación atómica en dos tablas: `recintos.coordinador_id` y `profiles.recinto
   }
 ```
 
-**Foto con detección de borrosidad** (varianza del Laplaciano):
+**Foto con detección de borrosidad** — el documento exige validar nitidez antes de aceptar la imagen del acta (§4.3 veedor, §5.3 sensores). La app usa la clase `BlurDetector`.
+
+#### Idea general (sin matemáticas pesadas)
+
+Una foto **nítida** del acta tiene **mucho contraste**: líneas de la tabla, números, texto, bordes del papel. Una foto **borrosa** (movimiento de mano, enfoque malo) hace que esos cambios sean **suaves**; los píxeles vecinos se parecen más.
+
+El algoritmo no “ve” texto; mide **cuánto cambia el brillo** entre píxeles vecinos. Si hay pocos cambios bruscos → probablemente borrosa.
+
+#### ¿Qué es el Laplaciano?
+
+El **operador Laplaciano** es un filtro clásico de visión por computadora. En cada píxel compara su brillo con el de arriba, abajo, izquierda y derecha:
+
+```
+Laplaciano = (arriba + abajo + izquierda + derecha) − 4 × centro
+```
+
+- En una **zona plana** (fondo uniforme), los vecinos se parecen al centro → Laplaciano ≈ **0**.
+- En un **borde nítido** (negro junto a blanco), hay salto fuerte → Laplaciano **grande** (positivo o negativo).
+
+En código (kernel discreto 4-vecinos):
+
+**Archivo:** `lib/core/services/blur_detector.dart` · líneas 120–127 · cálculo del Laplaciano por píxel
+
+```120:127:lib/core/services/blur_detector.dart
+      final c = lum[y * w + x];
+      final up = lum[(y - 1) * w + x];
+      final down = lum[(y + 1) * w + x];
+      final left = lum[y * w + (x - 1)];
+      final right = lum[y * w + (x + 1)];
+      final laplace = (up + down + left + right) - 4 * c;
+```
+
+#### ¿Qué es la “varianza del Laplaciano”?
+
+Se calcula el Laplaciano en **toda** la imagen y luego la **varianza** de esos valores (qué tan dispersos están respecto a la media):
+
+**Archivo:** `lib/core/services/blur_detector.dart` · líneas 143–144 · varianza = E[L²] − E[L]²
+
+```143:144:lib/core/services/blur_detector.dart
+  final mean = sum / count;
+  final variance = (sumSq / count) - (mean * mean);
+```
+
+| Tipo de foto | Varianza del Laplaciano |
+|--------------|-------------------------|
+| **Nítida** (muchos bordes) | **Alta** — muchos píxeles con Laplaciano grande y distinto |
+| **Borrosa** (transiciones suaves) | **Baja** — casi todo cerca de cero |
+
+Umbral en la app: `minLaplacianVariance = 180.0` (línea 45 de `blur_detector.dart`).
+
+#### ¿Por qué no basta solo con el Laplaciano?
+
+A veces una foto tiene **una zona muy contrastada** (ej. sombra fuerte en un rincón) pero el resto borroso. Por eso se combinan **tres métricas**; la foto debe pasar **las tres**:
+
+| Métrica | Qué mide | Umbral mínimo |
+|---------|----------|---------------|
+| **Varianza Laplaciana** | Bordes definidos en general | ≥ 180 |
+| **Tenengrad (Sobel)** | Energía del gradiente (otra forma de medir cambios de brillo) | ≥ 18 |
+| **Ratio de bordes fuertes** | % de píxeles con \|Laplaciano\| ≥ 35 (evita aprobar por un solo borde) | ≥ 4 % |
+
+**Archivo:** `lib/core/services/blur_detector.dart` · líneas 95–97 · decisión final `isSharp`
+
+```95:97:lib/core/services/blur_detector.dart
+    final isSharp = lapStats.variance >= minLaplacianVariance &&
+        tenengradMean >= minTenengradMean &&
+        lapStats.edgeRatio >= minEdgeRatio;
+```
+
+#### Preprocesado antes de medir
+
+1. Redimensionar a **800 px** de ancho (más rápido, comparable entre fotos).
+2. Convertir a **escala de grises** (solo brillo).
+3. **Gaussian blur** leve (radio 1) para ignorar ruido JPEG de la cámara, no el desenfoque real.
+
+**Archivo:** `lib/core/services/blur_detector.dart` · líneas 67–72
+
+```67:72:lib/core/services/blur_detector.dart
+    final resized = decoded.width > _analysisWidth
+        ? img.copyResize(decoded, width: _analysisWidth)
+        : decoded;
+    final gray = img.grayscale(resized);
+    // Reduce artefactos de compresion JPEG antes de medir enfoque.
+    final denoised = img.gaussianBlur(gray, radius: 1);
+```
+
+#### ¿Cuándo se ejecuta en la app?
+
+1. **Al tomar la foto** — `PhotoCaptureService.capture()` rechaza de inmediato si no pasa (`BlurryPhotoException`).
+2. **Al guardar el acta** — `ActaFormPage` vuelve a comprobar por si la foto cambió.
 
 **Archivo:** `lib/core/services/photo_capture_service.dart` · líneas 56–60 · método `capture()`
 
@@ -416,6 +512,8 @@ Operación atómica en dos tablas: `recintos.coordinador_id` y `profiles.recinto
       throw BlurryPhotoException(blur);
     }
 ```
+
+**Frase para la defensa:** *“Usamos la varianza del Laplaciano porque mide cuántos bordes nítidos hay en la imagen; una acta borrosa tiene transiciones suaves y puntúa bajo. Combinamos Sobel y ratio de bordes para no dejar pasar fotos borrosas con un solo punto enfocado.”*
 
 **GPS obligatorio** — sin permiso no continúa:
 
@@ -530,11 +628,13 @@ recintos (provincia, canton, parroquia, nombre, coordinador_id)
 
 ## 6. Credenciales de demostración
 
-| Rol | Cédula | Contraseña |
-|-----|--------|------------|
-| Provincial | `1710034065` | `Ecuador2026` |
+
+| Rol                 | Cédula       | Contraseña    |
+| ------------------- | ------------ | ------------- |
+| Provincial          | `1710034065` | `Ecuador2026` |
 | Coordinador recinto | `1710034073` | `Ecuador2026` |
-| Veedor | `1710034081` | `Ecuador2026` |
+| Veedor              | `1710034081` | `Ecuador2026` |
+
 
 APK release: `flutter build apk --release` → `build/app/outputs/flutter-apk/app-release.apk`
 
@@ -552,25 +652,23 @@ Esta sección responde directamente a lo que la rúbrica pide en **§7.2 Sustent
 
 **Qué respondemos en la sustentación:**
 
-| Criterio del enunciado | Cómo lo cubre Supabase en este proyecto |
-|------------------------|----------------------------------------|
-| Auth + confirmación de correo + reset (§3.1, §3.2) | Supabase Auth nativo + SMTP (Gmail) + páginas Vercel |
-| Reglas de acceso por rol (§5.1) | **Row Level Security (RLS)** en PostgreSQL por `role`, `recinto_id`, `veedor_id` |
-| Storage de fotos de actas (§5.1) | Bucket privado `actas-photos` |
-| Modelo relacional (recintos → mesas → actas) | PostgreSQL encaja naturalmente con JOINs y agregaciones (informe de votos, avance por recinto) |
-| Creación jerárquica de usuarios (§3.1) | Edge Function `create-user` con **service role** y validación server-side |
-| Offline (extra §7.3) | Implementado en **Flutter** (Drift + outbox), independiente del BaaS |
+
+| Criterio del enunciado                             | Cómo lo cubre Supabase en este proyecto                                                        |
+| -------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| Auth + confirmación de correo + reset (§3.1, §3.2) | Supabase Auth nativo + SMTP (Gmail) + páginas Vercel                                           |
+| Reglas de acceso por rol (§5.1)                    | **Row Level Security (RLS)** en PostgreSQL por `role`, `recinto_id`, `veedor_id`               |
+| Storage de fotos de actas (§5.1)                   | Bucket privado `actas-photos`                                                                  |
+| Modelo relacional (recintos → mesas → actas)       | PostgreSQL encaja naturalmente con JOINs y agregaciones (informe de votos, avance por recinto) |
+| Creación jerárquica de usuarios (§3.1)             | Edge Function `create-user` con **service role** y validación server-side                      |
+| Offline (extra §7.3)                               | Implementado en **Flutter** (Drift + outbox), independiente del BaaS                           |
+
 
 **Argumentos de defensa (memorizar en tus palabras):**
 
 1. **El enunciado no prohíbe Supabase.** En §3.2 dice literalmente usar el mecanismo nativo de **“Supabase o Appwrite”** para el enlace de restablecimiento. Elegimos Supabase Auth, que cumple el mismo contrato funcional.
-
 2. **RLS en PostgreSQL** modela mejor la jerarquía electoral (provincial → recinto → mesa → acta) que permisos genéricos de documentos. Las políticas SQL son auditables y se prueban en migraciones (`0002_rls.sql`).
-
 3. **Consultas analíticas del provincial** (votos consolidados, mesas con/sin acta, GPS por acta) son más simples en SQL relacional que en una BD orientada a documentos.
-
 4. **Sobre el límite de transacciones:** para una demo académica con pocos usuarios de prueba, el plan gratuito de Supabase es suficiente. La carga real del día electoral la absorbe la **persistencia local offline** del veedor; la sync es por lotes al reconectar, no transacción por transacción en tiempo real.
-
 5. **Appwrite vs Supabase no cambia la arquitectura Flutter.** Presentation → Domain → Data permanece igual; solo cambia el datasource remoto. La decisión es de **backend**, no de diseño de la app móvil.
 
 **Frase corta para cerrar:** *“Usamos Supabase porque el dominio es relacional y jerárquico; RLS nos da seguridad por rol en SQL, Auth cubre confirmación y reset como pide el documento, y el offline lo resolvimos en el cliente con Drift.”*
@@ -583,11 +681,13 @@ Esta sección responde directamente a lo que la rúbrica pide en **§7.2 Sustent
 
 **Cómo está organizado el proyecto:**
 
-| Capa | Responsabilidad | Ejemplos en el repo (rutas) |
-|------|-----------------|-----------------------------|
-| **Presentation** | UI, BLoC, navegación | `lib/features/auth/presentation/pages/login_page.dart`, `lib/features/auth/presentation/bloc/auth_bloc.dart`, `lib/features/actas/presentation/pages/acta_detail_page.dart` |
-| **Domain** | Reglas de negocio puras, sin Flutter ni Supabase | `lib/features/actas/domain/usecases/save_acta.dart`, `lib/core/validators/cedula_validator.dart`, entidades e interfaces en `domain/` |
-| **Data** | Fuentes concretas (Supabase, Drift, Storage) | `lib/features/auth/data/datasources/auth_remote_data_source.dart`, `lib/features/actas/data/repositories/actas_repository_impl.dart`, `lib/features/sync/data/sync_service.dart` |
+
+| Capa             | Responsabilidad                                  | Ejemplos en el repo (rutas)                                                                                                                                                      |
+| ---------------- | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Presentation** | UI, BLoC, navegación                             | `lib/features/auth/presentation/pages/login_page.dart`, `lib/features/auth/presentation/bloc/auth_bloc.dart`, `lib/features/actas/presentation/pages/acta_detail_page.dart`      |
+| **Domain**       | Reglas de negocio puras, sin Flutter ni Supabase | `lib/features/actas/domain/usecases/save_acta.dart`, `lib/core/validators/cedula_validator.dart`, entidades e interfaces en `domain/`                                            |
+| **Data**         | Fuentes concretas (Supabase, Drift, Storage)     | `lib/features/auth/data/datasources/auth_remote_data_source.dart`, `lib/features/actas/data/repositories/actas_repository_impl.dart`, `lib/features/sync/data/sync_service.dart` |
+
 
 **Use case como frontera de negocio** — la UI no valida votos directamente; delega al dominio:
 
@@ -630,13 +730,15 @@ abstract class UseCase<Type, Params> {
 
 **Por qué BLoC y no Provider/Riverpod:**
 
-| Ventaja de BLoC | Aplicación en Control Electoral |
-|-----------------|----------------------------------|
-| **Eventos → Estados** explícitos | `SignInRequested` → `AuthLoading` → `AuthAuthenticated` / `AuthError` |
-| **Estados inmutables y tipados** | Clases `Equatable` fáciles de comparar en `BlocBuilder` |
-| **Separación UI / lógica** | La página solo hace `context.read<AuthBloc>().add(...)` |
-| **Ecosistema maduro** | `flutter_bloc` + documentación oficial Flutter |
+
+| Ventaja de BLoC                   | Aplicación en Control Electoral                                         |
+| --------------------------------- | ----------------------------------------------------------------------- |
+| **Eventos → Estados** explícitos  | `SignInRequested` → `AuthLoading` → `AuthAuthenticated` / `AuthError`   |
+| **Estados inmutables y tipados**  | Clases `Equatable` fáciles de comparar en `BlocBuilder`                 |
+| **Separación UI / lógica**        | La página solo hace `context.read<AuthBloc>().add(...)`                 |
+| **Ecosistema maduro**             | `flutter_bloc` + documentación oficial Flutter                          |
 | **Encaja con Clean Architecture** | BLoC vive solo en `presentation/`; llama use cases, no Supabase directo |
+
 
 **Estados explícitos de auth** (carga, éxito, error, cambio de clave obligatorio):
 
@@ -880,18 +982,38 @@ En **Authentication → SMTP Settings** se configuró Gmail como servidor de sal
 
 **En este proyecto solo tenemos una:** `create-user` (`supabase/functions/create-user/index.ts`).
 
-| Pregunta del evaluador | Respuesta corta |
-|------------------------|-----------------|
-| ¿Qué es? | Función serverless en Supabase (Deno), desplegada en la nube |
-| ¿Qué hace en nuestra app? | Crea usuarios Auth + fila en `profiles` + correo de verificación |
-| ¿Por qué no hacerlo en Flutter? | Requiere `service_role`; exponerla en el APK sería una falla grave de seguridad |
-| ¿Cómo sabe quién llama? | El JWT del usuario logueado viaja en el header `Authorization` |
-| ¿Qué valida? | Rol del caller, jerarquía, cédula módulo 10, unicidad email/cédula, recinto libre |
-| ¿Equivalencia con Appwrite? | Similar a una **Cloud Function** de Appwrite que crea usuarios con la API admin |
+
+| Pregunta del evaluador          | Respuesta corta                                                                   |
+| ------------------------------- | --------------------------------------------------------------------------------- |
+| ¿Qué es?                        | Función serverless en Supabase (Deno), desplegada en la nube                      |
+| ¿Qué hace en nuestra app?       | Crea usuarios Auth + fila en `profiles` + correo de verificación                  |
+| ¿Por qué no hacerlo en Flutter? | Requiere `service_role`; exponerla en el APK sería una falla grave de seguridad   |
+| ¿Cómo sabe quién llama?         | El JWT del usuario logueado viaja en el header `Authorization`                    |
+| ¿Qué valida?                    | Rol del caller, jerarquía, cédula módulo 10, unicidad email/cédula, recinto libre |
+| ¿Equivalencia con Appwrite?     | Similar a una **Cloud Function** de Appwrite que crea usuarios con la API admin   |
+
 
 **Analogía útil:** la app es el mostrador; la Edge Function es la oficina trasera con llave maestra: el cliente pide “crear veedor”, pero solo el servidor puede abrir la caja fuerte (`auth.admin.createUser`).
 
 **Despliegue (recordatorio):** la función debe estar desplegada en el proyecto Supabase; si no, `functions.invoke` falla aunque el resto de la app funcione.
+
+---
+
+### 7.6 Detección de borrosidad: resumen para sustentación
+
+**Pregunta típica del evaluador:** *“¿Qué técnica usaste para medir la nitidez y por qué funciona?”*
+
+**Respuesta en 30 segundos:**
+
+1. Convertimos la foto a grises y medimos **bordes** con el **Laplaciano** (diferencia entre un píxel y sus vecinos).
+2. Calculamos la **varianza**: fotos nítidas → muchos bordes fuertes → varianza alta; fotos borrosas → varianza baja.
+3. Añadimos **Sobel (Tenengrad)** y **% de píxeles con borde fuerte** para no aprobar fotos borrosas con un solo detalle enfocado.
+4. Si falla, mostramos mensaje y pedimos **volver a tomar la foto** (requisito §5.3).
+
+**Analogía:** enfocar el acta es como leer letra impresa vs. letra difuminada; el Laplaciano cuenta cuántos “saltos” de claridad hay en la imagen. Poca variedad de saltos = borrosa.
+
+**Archivo principal:** `lib/core/services/blur_detector.dart`  
+**Integración:** `lib/core/services/photo_capture_service.dart` + validación extra en `lib/features/actas/presentation/pages/acta_form_page.dart`
 
 ---
 
@@ -909,97 +1031,56 @@ En **Authentication → SMTP Settings** se configuró Gmail como servidor de sal
 Responde por escrito o en voz alta antes de la sustentación. Al final del documento (§10) hay una **guía breve de respuestas** para autoevaluarte.
 
 1. ¿Cuáles son los tres roles de la aplicación y qué puede hacer cada uno?
-
 2. ¿Por qué el login pide cédula si Supabase Auth usa email y contraseña?
-
 3. Explica el algoritmo de validación de cédula ecuatoriana (módulo 10) en tus propias palabras.
-
 4. ¿Qué ocurre cuando un usuario creado desde la app intenta ingresar por primera vez?
-
 5. ¿Dónde se decide qué pantalla principal ve cada usuario después del login?
-
 6. ¿Qué validaciones debe cumplir un acta antes de guardarse?
-
 7. ¿Cómo funciona la detección de foto borrosa y por qué es importante?
-
 8. ¿Qué pasa si el veedor no concede permiso de ubicación?
-
 9. Describe el flujo **offline-first** desde que el veedor guarda un acta hasta que llega a Supabase.
-
 10. ¿Qué es el patrón Outbox y qué tablas locales lo implementan?
-
 11. ¿Cómo se resuelve un conflicto si la misma acta fue modificada localmente y en el servidor?
-
 12. ¿Qué es RLS y cómo impide que un veedor modifique actas de otra mesa?
-
 13. ¿Quién puede crear usuarios y qué restricciones tiene la Edge Function `create-user`?
-
 14. ¿Cómo se crean las mesas (JRV) al registrar un nuevo recinto?
-
 15. Si el documento pide Appwrite y el proyecto usa Supabase, ¿cómo justificarías esa elección en la sustentación?
-
 16. ¿Cuáles son las tres capas de Clean Architecture en este proyecto y qué archivo representa cada una?
-
 17. ¿Por qué elegiste BLoC y cómo se ve un estado de carga y un estado de error en la UI?
-
 18. ¿Quién envía físicamente el correo de confirmación: la app Flutter, Vercel o Supabase?
-
 19. Describe paso a paso qué ocurre desde que el provincial crea un veedor hasta que ese veedor puede iniciar sesión.
-
 20. ¿Para qué sirven las páginas `verify-email.html` y `reset-password.html` en Vercel?
-
 21. ¿Qué es una Edge Function y cuál es su trabajo concreto en Control Electoral?
 
 ---
 
 ## 10. Guía breve de respuestas (autoevaluación)
 
-<details>
-<summary>Mostrar respuestas modelo</summary>
+Mostrar respuestas modelo
 
 1. **Roles:** Provincial (recintos, coordinadores, avance global); Recinto (veedores, mesas, su recinto); Veedor (actas de sus mesas con foto/GPS/votos).
-
 2. **Cédula vs email:** UX ecuatoriana; RPC `get_email_by_cedula` resuelve el email internamente; Auth sigue siendo email+password.
-
 3. **Módulo 10:** 10 dígitos, provincia 01–24, posiciones impares×2 (restar 9 si >9), pares suman directo, dígito verificador = decena superior − total (mod 10).
-
 4. **Primer ingreso:** Debe confirmar correo; contraseña inicial `Ecuador2026`; `must_change_password` fuerza cambio antes del home.
-
-5. **`_RootGate` en `main.dart`:** `BlocBuilder<AuthBloc>` + `switch (profile.role)`.
-
+5. `**_RootGate` en `main.dart`:** `BlocBuilder<AuthBloc>` + `switch (profile.role)`.
 6. **Validaciones acta:** Sufragantes > 0; votos no negativos; suma = sufragantes; foto; GPS.
-
-7. **Blur:** `BlurDetector` calcula varianza Laplaciana y ratio de bordes; rechaza fotos borrosas del acta.
-
+7. **Blur / Laplaciano:** El Laplaciano mide cambio de brillo entre píxeles (bordes). La **varianza** resume cuántos bordes nítidos hay: alta = enfocada, baja = borrosa. Umbrales: varianza ≥180, Tenengrad ≥18, bordes fuertes ≥4%. Tres métricas juntas en `BlurDetector`; rechaza en captura y al guardar. Importante para que el acta escaneada sea legible en auditoría.
 8. **Sin GPS:** `LocationPermissionException`; la UI no permite guardar el acta.
-
 9. **Offline:** `saveActa` → `enqueueActa` → Drift + outbox → al volver red `processOutbox` → `pushActa` + Storage foto.
-
 10. **Outbox:** Cola FIFO de operaciones pendientes; tablas Drift `actas_local` y `outbox`.
-
 11. **Conflicto:** Last-write-wins por `updated_at`; si remoto es más nuevo, descarta local y elimina de outbox.
-
 12. **RLS:** Políticas Postgres por rol; veedor solo INSERT/UPDATE donde `mesas.veedor_id = auth.uid()`.
-
 13. **create-user:** Provincial → coordinadores; Recinto → veedores de su recinto; valida cédula; service role para crear auth.
-
 14. **Mesas:** `List.generate` en `createRecinto` inserta filas `{ recinto_id, numero_jrv: i+1 }`.
-
 15. **Supabase vs Appwrite:** §3.2 acepta Supabase; RLS en Postgres para roles; modelo relacional; offline en cliente; plan free suficiente para demo académica.
-
 16. **Capas:** Presentation (`AuthBloc`, páginas); Domain (`SaveActa`, entidades); Data (`AuthRemoteDataSource`, repos, Drift).
-
 17. **BLoC:** Eventos/estados explícitos; `AuthLoading` muestra spinner; `AuthError` abre diálogo; `ActaSaving` deshabilita botón guardar.
-
 18. **Correo:** Supabase Auth vía **Gmail SMTP** configurado en el dashboard; Flutter solo invoca `resend` o `resetPasswordForEmail`.
-
 19. **Crear veedor:** Formulario app → `create-user` → `createUser` + `resend signup` → correo Gmail → usuario confirma en Vercel → login cédula → cambio clave obligatorio → home veedor.
-
 20. **Vercel:** Landing HTTPS que recibe el enlace del correo, ejecuta `verifyOtp` o `updateUser` con el SDK JS, y muestra éxito/error al usuario.
-
 21. **Edge Function:** Código serverless en Supabase (Deno); en nuestra app `create-user` crea cuentas Auth con `service_role` de forma segura, valida jerarquía provincial→recinto→veedor, inserta `profiles` y envía correo de confirmación; la app solo hace `functions.invoke` con su JWT.
 
-</details>
+
 
 ---
 
